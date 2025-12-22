@@ -16,12 +16,21 @@ import gzip
 import io
 
 # Configure structured logging
+log_dir = '/app/logs'
+if not os.path.exists(log_dir):
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except PermissionError:
+        # Fallback for local testing or restricted environments
+        log_dir = 'logs'
+        os.makedirs(log_dir, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('/app/logs/app.log', mode='a')
+        logging.FileHandler(os.path.join(log_dir, 'app.log'), mode='a')
     ]
 )
 logger = logging.getLogger(__name__)
