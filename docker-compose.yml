@@ -9,10 +9,17 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./converted:/app/converted
+            - ./logs:/app/logs
     environment:
       - FLASK_ENV=production
       - MAX_FILE_SIZE=50
     restart: unless-stopped
+        healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - converter-network
 
@@ -23,3 +30,4 @@ networks:
 volumes:
   uploads:
   converted:
+      logs:
