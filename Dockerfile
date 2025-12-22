@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
+# Fix ImageMagick policy to allow PDF read/write
+RUN if [ -f /etc/ImageMagick-6/policy.xml ]; then \
+    sed -i 's/<policy domain="coder" rights="none" pattern="PDF" \/>/<policy domain="coder" rights="read|write" pattern="PDF" \/>/g' /etc/ImageMagick-6/policy.xml; \
+    fi
+
 # Configurar directorio de trabajo
 WORKDIR /app
 

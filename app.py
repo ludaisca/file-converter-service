@@ -5,6 +5,8 @@ import subprocess
 import uuid
 import requests
 from pathlib import Path
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -13,12 +15,14 @@ UPLOAD_FOLDER = '/app/uploads'
 CONVERTED_FOLDER = '/app/converted'
 MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', 50)) * 1024 * 1024  # MB to bytes
 MAX_DOWNLOAD_SIZE = int(os.getenv('MAX_DOWNLOAD_SIZE', 100)) * 1024 * 1024  # Para URLs
+CLEANUP_INTERVAL = 3600  # 1 hour
+FILE_TTL = 3600         # 1 hour
 
 # Formatos soportados
 SUPPORTED_CONVERSIONS = {
     'document': {
-        'from': ['.docx', '.doc', '.odt', '.rtf', '.txt'],
-        'to': ['.pdf', '.docx', '.txt', '.html']
+        'from': ['.docx', '.doc', '.odt', '.rtf', '.txt', '.md', '.html'],
+        'to': ['.pdf', '.docx', '.txt', '.html', '.odt', '.md']
     },
     'image': {
         'from': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'],
@@ -33,6 +37,30 @@ SUPPORTED_CONVERSIONS = {
         'to': ['.mp3', '.wav', '.ogg']
     }
 }
+
+def cleanup_files():
+    """Background task to clean up old files."""
+    while True:
+        try:
+            now = time.time()
+            for folder in [UPLOAD_FOLDER, CONVERTED_FOLDER]:
+                if not os.path.exists(folder):
+                    continue
+                for f in os.listdir(folder):
+                    f_path = os.path.join(folder, f)
+                    try:
+                        if os.path.isfile(f_path):
+                            if os.stat(f_path).st_mtime < now - FILE_TTL:
+                                os.remove(f_path)
+                    except Exception as e:
+                        print(f"Error processing {f_path}: {e}")
+        except Exception as e:
+            print(f"Error in cleanup loop: {e}")
+        time.sleep(CLEANUP_INTERVAL)
+
+# Start cleanup thread
+cleanup_thread = threading.Thread(target=cleanup_files, daemon=True)
+cleanup_thread.start()
 
 def download_file_from_url(url: str, upload_folder: Path) -> Path:
     """Descarga un archivo desde una URL remota"""
@@ -153,23 +181,53 @@ def download_file(filename):
 
 def perform_conversion(input_path, output_path, from_ext, to_ext):
     try:
-        # Documentos con LibreOffice
-        if from_ext in ['.docx', '.doc', '.odt', '.rtf'] and to_ext == '.pdf':
-            subprocess.run([
-                'libreoffice', '--headless', '--convert-to', 'pdf',
-                '--outdir', CONVERTED_FOLDER, input_path
-            ], check=True)
-            return {'success': True}
+        # LibreOffice conversions
+        libreoffice_formats = ['.docx', '.doc', '.odt', '.rtf', '.txt', '.html']
+        libreoffice_targets = ['.pdf', '.docx', '.txt', '.html', '.odt']
+
+        if from_ext in libreoffice_formats and to_ext in libreoffice_targets:
+            # Construct expected LibreOffice output filename
+            # LibreOffice uses the input filename stem + new extension
+            input_stem = Path(input_path).stem
+            temp_output_filename = f"{input_stem}{to_ext}"
+            temp_output_path = Path(CONVERTED_FOLDER) / temp_output_filename
+
+            format_arg = to_ext.lstrip('.')
+            # Special case for text
+            if format_arg == 'txt':
+                format_arg = 'txt:Text'
+
+            cmd = ['libreoffice', '--headless', '--convert-to', format_arg, '--outdir', CONVERTED_FOLDER, input_path]
+            subprocess.run(cmd, check=True)
+
+            # Check if file exists and rename
+            if temp_output_path.exists():
+                if temp_output_path != Path(output_path):
+                    if Path(output_path).exists():
+                        Path(output_path).unlink()
+                    temp_output_path.rename(output_path)
+                return {'success': True}
+            else:
+                 # If temp file not found, check if maybe it was saved with different extension?
+                 # E.g. .html might save as .html, but sometimes .htm?
+                 # For now assume it failed.
+                 return {'success': False, 'error': 'LibreOffice conversion failed to produce output file'}
         
+        # Pandoc conversions (MarkDown, etc)
+        elif from_ext == '.md' or to_ext == '.md':
+             cmd = ['pandoc', input_path, '-o', output_path]
+             subprocess.run(cmd, check=True)
+             return {'success': True}
+
         # Imágenes con ImageMagick
-        elif from_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'] and to_ext in ['.jpg', '.png', '.pdf', '.webp']:
+        elif from_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'] and to_ext in ['.jpg', '.png', '.pdf', '.webp']:
             subprocess.run([
                 'convert', input_path, output_path
             ], check=True)
             return {'success': True}
         
         # Video con FFmpeg
-        elif from_ext in ['.mp4', '.avi', '.mov', '.mkv'] and to_ext in ['.mp4', '.avi', '.gif']:
+        elif from_ext in ['.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv'] and to_ext in ['.mp4', '.avi', '.gif']:
             subprocess.run([
                 'ffmpeg', '-i', input_path, '-y', output_path
             ], check=True)
