@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  file-converter:
+    build: .
+    container_name: file-converter-api
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./converted:/app/converted
+    environment:
+      - FLASK_ENV=production
+      - MAX_FILE_SIZE=50
+    restart: unless-stopped
+    networks:
+      - converter-network
+
+networks:
+  converter-network:
+    driver: bridge
+
+volumes:
+  uploads:
+  converted:
