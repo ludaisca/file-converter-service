@@ -9,6 +9,7 @@ Servicio de conversión de archivos desplegable con Docker Compose.
 - Conversión de video (MP4, AVI, MOV, MKV → MP4, AVI, GIF)
 - Conversión de audio (MP3, WAV, OGG, M4A, FLAC → MP3, WAV, OGG)
 - API REST simple y eficiente
+- - Soporte de conversión desde URL (descarga automática de archivos remotos)
 - Despliegue con Docker Compose
 
 ## 📋 Requisitos
@@ -58,6 +59,24 @@ Respuesta:
   "success": true,
   "file_id": "uuid-generado",
   "download_url": "/download/uuid-generado.pdf"
+}
+```
+
+### Convertir desde URL
+
+```bash
+curl -X POST -F "url=https://ejemplo.com/archivo.m4a" -F "format=mp3" \
+  http://localhost:5000/convert
+```
+
+Respuesta:
+
+```json
+{
+  "success": true,
+  "file_id": "uuid-generado",
+  "output_format": "mp3",
+  "download_url": "/download/uuid-generado.mp3"
 }
 ```
 
