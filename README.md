@@ -3,32 +3,71 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![Python](https://img.shields.io/badge/Python-3.11+-green.svg)](https://www.python.org/)
+[![Versión](https://img.shields.io/badge/versión-1.0.0-blue.svg)](https://github.com/thecocoblue/file-converter-service/releases)
 
-Servicio de conversión de archivos multimedia desplegable con Docker Compose. API REST simple, rápida y eficiente para convertir documentos, imágenes, audio y video.
+Servicio de conversión de archivos multimedia desplegable con Docker. API REST simple, rápida y eficiente para convertir documentos, imágenes, audio y video.
+
+---
+
+## 📚 Tabla de Contenidos
+
+- [Características](#-características)
+- [Requisitos](#-requisitos)
+- [Instalación Rápida](#-instalación-rápida)
+- [Uso de la API](#-uso-de-la-api)
+- [Configuración](#-configuración)
+- [Arquitectura](#-arquitectura)
+- [Documentación](#-documentación)
+- [Despliegue](#-despliegue)
+- [Seguridad](#-seguridad)
+- [Contribuir](#-contribuir)
+- [Licencia](#-licencia)
+
+---
 
 ## 🚀 Características
 
-- **Conversión de Documentos**: DOCX, DOC, ODT → PDF, HTML, TXT
-- **Conversión de Imágenes**: JPG, PNG, GIF, BMP → JPG, PNG, PDF, WebP
-- **Conversión de Video**: MP4, AVI, MOV, MKV → MP4, AVI, GIF
-- **Conversión de Audio**: MP3, WAV, OGG, M4A, FLAC → MP3, WAV, OGG
-- **API REST**: Endpoints simples y bien documentados
-- **Conversión desde URL**: Descarga automática de archivos remotos
-- **Health Monitoring**: Sistema de monitoreo de salud con métricas
-- **Logging Estructurado**: Sistema de logs rotativos y consultables
-- **Compresión Gzip**: Respuestas comprimidas automáticamente
-- **Docker Ready**: Despliegue con un solo comando
+### Conversiones Soportadas
+
+- **📄 Documentos**: DOCX, DOC, ODT, RTF, TXT → PDF, HTML, TXT, DOCX
+- **🖼️ Imágenes**: JPG, PNG, GIF, BMP, TIFF, WebP → JPG, PNG, PDF, WebP
+- **🎥 Video**: MP4, AVI, MOV, MKV, FLV, WMV → MP4, AVI, GIF
+- **🎵 Audio**: MP3, WAV, OGG, M4A, FLAC → MP3, WAV, OGG
+
+### Características Principales
+
+- ✅ **API REST** simple y bien documentada
+- ✅ **Conversión desde URL** - Descarga automática de archivos remotos
+- ✅ **Health Monitoring** - Métricas del sistema (CPU, RAM, disco)
+- ✅ **Logging Estructurado** - Sistema de logs con niveles configurables
+- ✅ **Compresión GZIP** - Respuestas comprimidas automáticamente
+- ✅ **Limpieza Automática** - Gestión de archivos temporales con TTL configurable
+- ✅ **Docker Ready** - Despliegue con un solo comando
+- ✅ **Healthcheck Integrado** - Monitoreo de contenedor
+- ✅ **Seguridad** - Validación de archivos, nombres seguros con UUID
+- ✅ **Sin Dependencias Externas** - Todo incluido en el contenedor
+
+---
 
 ## 📋 Requisitos
 
+### Mínimos
 - Docker >= 20.10
 - Docker Compose >= 2.0
-- 2GB RAM mínimo
-- 10GB espacio en disco
+- 512 MB RAM
+- 2 GB espacio en disco
 
-## 🔧 Instalación
+### Recomendados
+- 1 GB RAM
+- 10 GB espacio en disco
+- CPU con 2+ cores
+- SSD para mejor rendimiento
 
-### Instalación Rápida
+---
+
+## ⚡ Instalación Rápida
+
+### Opción 1: Docker Compose (Recomendado)
 
 ```bash
 # 1. Clonar el repositorio
@@ -37,7 +76,7 @@ cd file-converter-service
 
 # 2. Configurar variables de entorno
 cp .env.example .env
-# Edita .env según tus necesidades
+# Edita .env según tus necesidades (opcional)
 
 # 3. Iniciar el servicio
 docker-compose up -d
@@ -46,29 +85,21 @@ docker-compose up -d
 curl http://localhost:5000/health
 ```
 
-### Configuración Avanzada
+### Opción 2: Coolify
 
-Edita el archivo `.env` para personalizar:
+Ver [guía completa de despliegue en Coolify](docs/DEPLOYMENT.md#despliegue-en-coolify).
 
-```env
-# Tamaño máximo de archivo (en MB)
-MAX_FILE_SIZE=50
+### Opción 3: Manual
 
-# Entorno de Flask
-FLASK_ENV=production
+Ver [guía de despliegue manual](docs/DEPLOYMENT.md#despliegue-manual).
 
-# Puerto del servicio
-PORT=5000
+---
 
-# Nivel de logging (DEBUG, INFO, WARNING, ERROR)
-LOG_LEVEL=INFO
-```
+## 💻 Uso de la API
 
-## 📖 Uso de la API
+### 1. Verificar Salud del Servicio
 
-### 1. Health Check
-
-Verifica el estado del servicio y métricas del sistema:
+Obtiene métricas del sistema en tiempo real:
 
 ```bash
 curl http://localhost:5000/health
@@ -79,7 +110,7 @@ curl http://localhost:5000/health
 {
   "status": "healthy",
   "service": "file-converter",
-  "timestamp": "2025-12-23T15:10:00.000Z",
+  "timestamp": "2024-12-23T15:10:00.000Z",
   "uptime_seconds": 3600.5,
   "system": {
     "cpu_usage_percent": 2.5,
@@ -103,29 +134,7 @@ curl http://localhost:5000/health
 curl http://localhost:5000/formats
 ```
 
-**Respuesta:**
-```json
-{
-  "documents": {
-    "input": ["docx", "doc", "odt", "rtf"],
-    "output": ["pdf", "html", "txt"]
-  },
-  "images": {
-    "input": ["jpg", "jpeg", "png", "gif", "bmp"],
-    "output": ["jpg", "png", "pdf", "webp"]
-  },
-  "video": {
-    "input": ["mp4", "avi", "mov", "mkv"],
-    "output": ["mp4", "avi", "gif"]
-  },
-  "audio": {
-    "input": ["mp3", "wav", "ogg", "m4a", "flac"],
-    "output": ["mp3", "wav", "ogg"]
-  }
-}
-```
-
-### 3. Convertir Archivo Local
+### 3. Convertir Archivo (Subida Local)
 
 ```bash
 curl -X POST \
@@ -134,7 +143,7 @@ curl -X POST \
   http://localhost:5000/convert
 ```
 
-**Respuesta exitosa:**
+**Respuesta:**
 ```json
 {
   "success": true,
@@ -148,50 +157,121 @@ curl -X POST \
 
 ```bash
 curl -X POST \
-  -F "url=https://example.com/audio.m4a" \
+  -F "url=https://ejemplo.com/audio.m4a" \
   -F "format=mp3" \
   http://localhost:5000/convert
-```
-
-**Respuesta:**
-```json
-{
-  "success": true,
-  "file_id": "b8c4d3e2f1a5",
-  "output_format": "mp3",
-  "download_url": "/download/b8c4d3e2f1a5.mp3"
-}
 ```
 
 ### 5. Descargar Archivo Convertido
 
 ```bash
-# Usando curl
+# Con curl
 curl -O http://localhost:5000/download/a7b3c9d2e1f4.pdf
 
-# O con wget
+# Con wget
 wget http://localhost:5000/download/a7b3c9d2e1f4.pdf
 ```
 
-## 🛠️ Configuración
+### Ejemplos de Integración
+
+#### Python
+```python
+import requests
+
+# Convertir archivo
+files = {'file': open('documento.docx', 'rb')}
+data = {'format': 'pdf'}
+response = requests.post('http://localhost:5000/convert', files=files, data=data)
+result = response.json()
+
+# Descargar
+download_url = f"http://localhost:5000{result['download_url']}"
+converted = requests.get(download_url)
+with open('salida.pdf', 'wb') as f:
+    f.write(converted.content)
+```
+
+#### n8n Workflow
+```json
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "http://localhost:5000/convert",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{"name": "format", "value": "pdf"}]
+        },
+        "sendBinaryData": true
+      },
+      "name": "Convertir Archivo",
+      "type": "n8n-nodes-base.httpRequest"
+    }
+  ]
+}
+```
+
+Para más ejemplos, ver [docs/API.md](docs/API.md#ejemplos-de-integración).
+
+---
+
+## ⚙️ Configuración
 
 ### Variables de Entorno
 
+#### Configuración Básica
+
 | Variable | Default | Descripción |
 |----------|---------|-------------|
-| `MAX_FILE_SIZE` | 50 | Tamaño máximo de archivo en MB |
-| `FLASK_ENV` | production | Entorno de Flask (production/development) |
-| `PORT` | 5000 | Puerto donde escucha el servicio |
-| `LOG_LEVEL` | INFO | Nivel de logging (DEBUG/INFO/WARNING/ERROR) |
+| `FLASK_ENV` | `production` | Entorno de Flask (`production`/`development`) |
+| `MAX_FILE_SIZE` | `50` | Tamaño máximo de archivo en MB |
+| `MAX_DOWNLOAD_SIZE` | `100` | Tamaño máximo de descarga en MB |
 
-### Volúmenes Docker
+#### Configuración Avanzada
 
-```yaml
-volumes:
-  - ./uploads:/app/uploads        # Archivos temporales subidos
-  - ./converted:/app/converted    # Archivos convertidos
-  - ./logs:/app/logs              # Logs del sistema
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `CLEANUP_INTERVAL` | `3600` | Intervalo de limpieza en segundos |
+| `FILE_TTL` | `3600` | Tiempo de vida de archivos en segundos |
+| `LOG_LEVEL` | `INFO` | Nivel de logging (DEBUG/INFO/WARNING/ERROR) |
+| `LOG_FILE` | `/app/logs/app.log` | Ruta del archivo de log |
+| `ENABLE_HEALTH_MONITORING` | `True` | Habilitar monitoreo de salud |
+| `API_VERSION` | `1.0.0` | Versión de la API |
+
+#### Rutas de Directorios
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `UPLOAD_FOLDER` | `/app/uploads` | Directorio de archivos subidos |
+| `CONVERTED_FOLDER` | `/app/converted` | Directorio de archivos convertidos |
+| `LOGS_FOLDER` | `/app/logs` | Directorio de logs |
+
+### Ejemplo de .env para Producción
+
+```bash
+# Flask
+FLASK_ENV=production
+FLASK_DEBUG=False
+
+# Límites de archivos
+MAX_FILE_SIZE=100        # 100 MB para archivos grandes
+MAX_DOWNLOAD_SIZE=200    # 200 MB para descargas
+
+# Limpieza cada 30 minutos
+CLEANUP_INTERVAL=1800
+FILE_TTL=3600
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FILE=/app/logs/app.log
+
+# Monitoreo
+ENABLE_HEALTH_MONITORING=True
 ```
+
+Para más detalles, ver [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#variables-de-entorno).
+
+---
 
 ## 🏗️ Arquitectura
 
@@ -202,192 +282,332 @@ volumes:
 - **ImageMagick**: Procesamiento y conversión de imágenes
 - **FFmpeg**: Conversión de audio y video
 - **Pandoc**: Conversión avanzada de documentos
-- **psutil**: Monitoreo de sistema
-- **Gunicorn**: WSGI server para producción
+- **psutil**: Monitoreo de métricas del sistema
 
 ### Estructura del Proyecto
 
 ```
 file-converter-service/
-├── app.py                 # Punto de entrada
+├── app.py                    # Punto de entrada
 ├── src/
-│   ├── config.py         # Configuración centralizada
-│   ├── routes.py         # Endpoints de la API
-│   ├── utils.py          # Utilidades compartidas
-│   ├── logging.py        # Sistema de logging
-│   └── converters/       # Módulos de conversión
-│       ├── factory.py    # Factory pattern
-│       ├── document.py   # Conversión de documentos
-│       ├── image.py      # Conversión de imágenes
-│       ├── video.py      # Conversión de video
-│       └── audio.py      # Conversión de audio
-├── tests/                # Suite de pruebas
-├── Dockerfile            # Imagen Docker
-├── docker-compose.yml    # Orquestación
-└── requirements.txt      # Dependencias Python
+│   ├── config.py            # Configuración centralizada
+│   ├── routes.py            # Endpoints de la API
+│   ├── utils.py             # Utilidades (descarga, limpieza)
+│   ├── logging.py           # Sistema de logging
+│   └── converters/          # Módulos de conversión
+│       ├── base.py          # Clase base abstracta
+│       ├── factory.py       # Factory pattern
+│       ├── libreoffice.py   # Conversor de documentos
+│       ├── imagemagick.py   # Conversor de imágenes
+│       └── ffmpeg.py        # Conversor de audio/video
+├── tests/                   # Suite de pruebas
+├── docs/                    # Documentación
+│   ├── API.md               # Documentación de API
+│   ├── DEPLOYMENT.md        # Guía de despliegue
+│   └── TROUBLESHOOTING.md   # Solución de problemas
+├── Dockerfile               # Imagen Docker
+├── docker-compose.yml       # Orquestación
+├── requirements.txt         # Dependencias Python
+├── .env.example             # Template de configuración
+├── LICENSE                  # Licencia MIT
+├── CHANGELOG.md             # Historial de versiones
+├── SECURITY.md              # Políticas de seguridad
+└── CONTRIBUTING.md          # Guía de contribución
 ```
 
-## 📝 API Endpoints
+### Flujo de Conversión
+```
+1. Request → Validación de parámetros
+2. Upload/Download → Guardar en /app/uploads
+3. Validación de tamaño y extensión
+4. Factory → Seleccionar conversor apropiado
+5. Conversión → Procesar archivo
+6. Guardar en /app/converted
+7. Limpieza de archivo original
+8. Response → URL de descarga
+9. Background cleanup → Eliminar después de TTL
+```
 
-| Endpoint | Método | Descripción | Auth |
-|----------|--------|-------------|------|
+---
+
+## 📚 Documentación
+
+### Documentos Disponibles
+
+- **[API.md](docs/API.md)** - Documentación completa de la API REST
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Guía de despliegue (Docker, Coolify, Manual)
+- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Solución de problemas comunes
+- **[SECURITY.md](SECURITY.md)** - Políticas de seguridad
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Guía para contribuidores
+- **[CHANGELOG.md](CHANGELOG.md)** - Historial de cambios
+
+### API Endpoints
+
+| Endpoint | Método | Descripción | Autenticación |
+|----------|--------|-------------|---------------|
 | `/health` | GET | Health check con métricas del sistema | No |
 | `/formats` | GET | Lista de formatos soportados | No |
 | `/convert` | POST | Convertir archivo (local o URL) | No |
 | `/download/<filename>` | GET | Descargar archivo convertido | No |
 
-Para documentación detallada de la API, consulta [API.md](./API.md).
+Para documentación detallada, ver [docs/API.md](docs/API.md).
 
-## 🔐 Seguridad
+---
 
-- ✅ Validación de tamaño de archivo configurable
-- ✅ Nombres de archivo seguros con UUID
-- ✅ Limpieza automática de archivos temporales
-- ✅ Sanitización de nombres de archivo
-- ✅ Validación de extensiones permitidas
-- ✅ Sin ejecución de código arbitrario
-- ✅ Logs sin datos sensibles
+## 🚀 Despliegue
 
-## 🐛 Troubleshooting
-
-### El servicio no inicia
+### Docker Compose (Local/Servidor)
 
 ```bash
-# Verificar logs
-docker-compose logs file-converter
+# Iniciar
+docker-compose up -d
 
-# Verificar puertos en uso
-lsof -i :5000
+# Ver logs
+docker-compose logs -f
 
-# Reconstruir imagen
+# Detener
+docker-compose down
+
+# Actualizar
+git pull
 docker-compose down
 docker-compose build --no-cache
 docker-compose up -d
 ```
 
-### Conversión falla
+### Coolify (Recomendado para Producción)
+
+1. En Coolify: **+ New Resource** → **Docker Compose**
+2. Repository: `https://github.com/thecocoblue/file-converter-service.git`
+3. Configurar variables de entorno
+4. Configurar dominio y SSL
+5. Deploy
+
+Ver [guía completa en docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#despliegue-en-coolify).
+
+### Proxy Reverso (Nginx/Traefik)
+
+Ver ejemplos de configuración en [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#configuración-de-proxy-reverso).
+
+---
+
+## 🔒 Seguridad
+
+### Medidas Implementadas
+
+- ✅ Sanitización de nombres de archivo con `secure_filename()`
+- ✅ Nombres únicos con UUID para evitar colisiones
+- ✅ Validación de tamaño de archivos (configurable)
+- ✅ Timeout de 30 segundos en descargas desde URL
+- ✅ Stream processing para evitar saturar memoria
+- ✅ Limpieza automática de archivos temporales
+- ✅ Política de ImageMagick modificada para PDFs seguros
+- ✅ Logging sin datos sensibles
+
+### Recomendaciones para Producción
+
+- ⚠️ **Usar HTTPS siempre** (Coolify lo configura automáticamente)
+- ⚠️ **Implementar autenticación** (API keys, Basic Auth, o VPN)
+- ⚠️ **Configurar rate limiting** en proxy reverso
+- ⚠️ **No exponer puerto 5000 directamente** a internet
+- ⚠️ **Configurar firewall** correctamente
+- ⚠️ **Monitorear logs** regularmente
+
+Ver [SECURITY.md](SECURITY.md) para detalles completos.
+
+---
+
+## 🐛 Troubleshooting
+
+### Problemas Comunes
+
+#### El servicio no inicia
 
 ```bash
-# Verificar que el archivo existe
-ls -la uploads/
+# Ver logs
+docker-compose logs file-converter
 
-# Verificar logs de conversión
-docker-compose logs file-converter | grep ERROR
+# Verificar puertos
+lsof -i :5000
 
-# Verificar espacio en disco
-df -h
+# Reconstruir
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
 ```
 
-### Error "File too large"
+#### Error "File too large"
 
-Aumenta el límite en `.env`:
-```env
-MAX_FILE_SIZE=100
+Edita `.env`:
+```bash
+MAX_FILE_SIZE=100  # Aumentar a 100 MB
 ```
 
-Luego reinicia:
+Reinicia:
 ```bash
 docker-compose restart
 ```
 
-### Health check retorna "unhealthy"
+#### Conversiones fallan
 
 ```bash
-# Verificar recursos del sistema
-docker stats file-converter
+# Ver logs detallados
+docker exec -it file-converter-api tail -f /app/logs/app.log
 
-# Verificar espacio en disco
-docker exec file-converter df -h
-
-# Revisar logs
-docker-compose logs file-converter --tail 100
+# Verificar herramientas instaladas
+docker exec -it file-converter-api which libreoffice
+docker exec -it file-converter-api which ffmpeg
 ```
 
-## 📊 Monitoreo
+Ver [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) para más soluciones.
 
-### Logs
-
-Los logs se guardan en `./logs/app.log` con rotación automática:
-
-```bash
-# Ver logs en tiempo real
-tail -f logs/app.log
-
-# Buscar errores
-grep ERROR logs/app.log
-
-# Ver logs de Docker
-docker-compose logs -f file-converter
-```
-
-### Métricas
-
-Consulta `/health` para métricas en tiempo real:
-- CPU usage
-- Memoria disponible
-- Uso de disco
-- Estado de carpetas
-
-## 🚀 Despliegue en Producción
-
-Ver [DEPLOYMENT.md](./DEPLOYMENT.md) para:
-- Despliegue en Coolify
-- Configuración de Nginx como reverse proxy
-- SSL/TLS con Let's Encrypt
-- Escalado horizontal
-- Backup y recuperación
+---
 
 ## 🧪 Testing
 
 ```bash
-# Ejecutar tests
+# Ejecutar todos los tests
 python -m pytest tests/
 
 # Con cobertura
 python -m pytest tests/ --cov=src
 
 # Tests específicos
-python -m pytest tests/test_converters.py
+python -m pytest tests/test_converters.py -v
 ```
 
-## 📈 Roadmap
+---
+
+## 📊 Monitoreo
+
+### Logs
+
+```bash
+# Logs en tiempo real
+tail -f logs/app.log
+
+# Buscar errores
+grep ERROR logs/app.log
+
+# Logs de Docker
+docker-compose logs -f file-converter
+```
+
+### Métricas
+
+```bash
+# Health check
+curl http://localhost:5000/health | jq
+
+# Estadísticas de Docker
+docker stats file-converter-api
+```
+
+---
+
+## 🗺️ Roadmap
+
+### Versión 1.1.0 (Planeada)
 
 - [ ] Autenticación con API keys
-- [ ] Rate limiting
-- [ ] Cola de trabajos con Redis
+- [ ] Rate limiting integrado
+- [ ] Queue system con Redis
 - [ ] Webhooks para notificaciones
+
+### Versión 1.2.0 (Futuro)
+
 - [ ] Conversión batch de múltiples archivos
 - [ ] OCR para PDFs escaneados
 - [ ] Watermarking de imágenes
+- [ ] Parámetros de calidad configurables
+- [ ] Interfaz web simple
+
+### Ideas de la Comunidad
+
+- [ ] Soporte para más formatos (EPUB, MOBI, etc.)
 - [ ] Compresión de archivos convertidos
+- [ ] Edición básica de imágenes (resize, crop)
+- [ ] Extracción de texto de imágenes
+
+Ver [Issues](https://github.com/thecocoblue/file-converter-service/issues) para sugerir funcionalidades.
+
+---
 
 ## 🤝 Contribuir
 
-Las contribuciones son bienvenidas. Por favor:
+¡Las contribuciones son bienvenidas! Por favor:
 
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'feat: Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
+1. Lee [CONTRIBUTING.md](CONTRIBUTING.md)
+2. Fork el proyecto
+3. Crea una rama (`git checkout -b feature/AmazingFeature`)
+4. Commit tus cambios (`git commit -m 'feat: Add AmazingFeature'`)
+5. Push a la rama (`git push origin feature/AmazingFeature`)
+6. Abre un Pull Request
 
-## 📄 Licencia
+### Áreas donde puedes ayudar
+
+- 🐛 Reportar bugs
+- 📝 Mejorar documentación
+- 🌐 Traducir a otros idiomas
+- 💻 Agregar nuevas funcionalidades
+- 🧪 Escribir tests
+- ⭐ Dar estrella al repo
+
+---
+
+## 📝 Changelog
+
+Ver [CHANGELOG.md](CHANGELOG.md) para historial completo de versiones.
+
+### Versión 1.0.0 (Actual)
+
+- ✅ Conversión de documentos, imágenes, audio y video
+- ✅ API REST completa
+- ✅ Conversión desde URL
+- ✅ Health monitoring con métricas
+- ✅ Logging estructurado
+- ✅ Compresión GZIP
+- ✅ Limpieza automática de archivos
+- ✅ Docker y Docker Compose
+- ✅ Documentación completa en español
+
+---
+
+## 📜 Licencia
 
 Este proyecto está bajo la Licencia MIT. Ver [LICENSE](LICENSE) para más detalles.
+
+---
 
 ## 👤 Autor
 
 **thecocoblue**
 
 - GitHub: [@thecocoblue](https://github.com/thecocoblue)
-
-## 🙏 Agradecimientos
-
-- LibreOffice por el excelente soporte de conversión de documentos
-- FFmpeg por las capacidades multimedia
-- ImageMagick por el procesamiento de imágenes
-- La comunidad de Docker por las mejores prácticas
+- Email: [luis.islas@ludaisca.com](mailto:luis.islas@ludaisca.com)
 
 ---
 
-⭐ Si este proyecto te resulta útil, considera darle una estrella en GitHub!
+## 🙏 Agradecimientos
+
+- [LibreOffice](https://www.libreoffice.org/) - Conversión de documentos
+- [FFmpeg](https://ffmpeg.org/) - Procesamiento multimedia
+- [ImageMagick](https://imagemagick.org/) - Procesamiento de imágenes
+- [Flask](https://flask.palletsprojects.com/) - Framework web
+- [Docker](https://www.docker.com/) - Containerización
+- La comunidad de código abierto
+
+---
+
+## 🌟 Soporte
+
+Si este proyecto te resulta útil:
+
+- ⭐ Dale una estrella en GitHub
+- 🐛 [Reporta bugs](https://github.com/thecocoblue/file-converter-service/issues)
+- 💡 [Sugiere mejoras](https://github.com/thecocoblue/file-converter-service/issues/new)
+- 🔀 Comparte con otros desarrolladores
+
+---
+
+**Última actualización**: 23 de diciembre de 2024 | **Versión**: 1.0.0
