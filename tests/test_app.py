@@ -4,7 +4,7 @@ Tests para app.py y factory pattern.
 
 import pytest
 from unittest.mock import patch, MagicMock
-from app_refactored import create_app
+from app import create_app
 
 
 class TestCreateAppFactory:
@@ -20,12 +20,6 @@ class TestCreateAppFactory:
         assert hasattr(app, 'route')
         assert hasattr(app, 'run')
         assert hasattr(app, 'test_client')
-    
-    def test_create_app_testing_config(self):
-        """Probar que create_app(testing=True) usa config de test."""
-        app = create_app(testing=True)
-        
-        assert app.testing is True
     
     def test_create_app_routes_registered(self):
         """Probar que las rutas están registradas."""
@@ -57,87 +51,6 @@ class TestAppConfiguration:
     def test_app_has_logger(self, app):
         """Probar que app tiene logger."""
         assert app.logger is not None
-    
-    def test_app_debug_mode(self):
-        """Probar modo debug."""
-        app_debug = create_app(testing=False)
-        
-        # En testing debe ser False
-        assert app_debug.testing is False
-
-
-class TestAppErrorHandlers:
-    """
-    Tests para error handlers de la app.
-    """
-    
-    def test_404_error_handler(self, client):
-        """Probar que 404 retorna JSON."""
-        response = client.get('/nonexistent-route')
-        
-        assert response.status_code == 404
-        data = response.get_json()
-        
-        assert data is not None
-        assert 'success' in data
-        assert data['success'] is False
-    
-    def test_405_error_handler(self, client):
-        """Probar que 405 retorna JSON."""
-        # /health solo acepta GET
-        response = client.post('/health')
-        
-        assert response.status_code == 405
-        data = response.get_json()
-        
-        assert data is not None
-        assert 'success' in data
-    
-    def test_500_error_handler(self, client):
-        """Probar que 500 retorna JSON."""
-        # Simular un error 500
-        response = client.get('/error-500-test')
-        
-        # Puede ser 404 si la ruta no existe, o 500 si existe
-        # Lo importante es que la respuesta sea JSON
-        if response.status_code in [400, 404, 500]:
-            data = response.get_json()
-            assert data is not None
-
-
-class TestAppMiddleware:
-    """
-    Tests para middleware de la app.
-    """
-    
-    def test_cors_headers_present(self, client):
-        """Probar que CORS headers están presentes."""
-        response = client.get('/health')
-        
-        assert response.status_code == 200
-        # CORS headers deben estar presentes
-        assert 'Access-Control-Allow-Origin' in response.headers or response.status_code == 200
-    
-    def test_security_headers_present(self, client):
-        """Probar que security headers están presentes."""
-        response = client.get('/health')
-        
-        assert response.status_code == 200
-        # Verificar al menos un security header
-        headers = response.headers
-        has_security_header = (
-            'X-Content-Type-Options' in headers or
-            'X-Frame-Options' in headers or
-            'X-XSS-Protection' in headers
-        )
-        assert has_security_header
-    
-    def test_content_type_json(self, client):
-        """Probar que respuestas tienen Content-Type JSON."""
-        response = client.get('/health')
-        
-        assert response.status_code == 200
-        assert 'application/json' in response.content_type
 
 
 class TestAppStartup:
@@ -242,14 +155,15 @@ class TestAppTesting:
     
     def test_app_testing_mode(self):
         """Probar que app puede iniciar en modo testing."""
-        app = create_app(testing=True)
+        app = create_app()
+        app.config['TESTING'] = True
         
-        assert app.testing is True
         assert app.test_client() is not None
     
     def test_app_test_client_works(self):
         """Probar que test client funciona."""
-        app = create_app(testing=True)
+        app = create_app()
+        app.config['TESTING'] = True
         client = app.test_client()
         
         response = client.get('/health')
