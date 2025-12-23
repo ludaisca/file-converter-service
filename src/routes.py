@@ -10,9 +10,15 @@ from .config import Config
 from .logging import logger
 from .utils import gzip_response, download_file_from_url
 from .converters.factory import ConverterFactory
+from .validators import FileValidator
+from .ocr import OCRProcessor
 
 main_bp = Blueprint('main', __name__)
 converter_factory = ConverterFactory()
+
+# Inicializar OCR processor
+ocr_enabled = os.getenv('ENABLE_OCR', 'true').lower() == 'true'
+ocr_processor = OCRProcessor(default_lang=os.getenv('OCR_DEFAULT_LANGUAGE', 'spa')) if ocr_enabled else None
 
 @main_bp.route('/health', methods=['GET'])
 def health_check():
@@ -39,6 +45,10 @@ def health_check():
                 'upload_folder_exists': os.path.exists(Config.UPLOAD_FOLDER),
                 'converted_folder_exists': os.path.exists(Config.CONVERTED_FOLDER),
                 'logs_folder_exists': os.path.exists(Config.LOGS_FOLDER)
+            },
+            'features': {
+                'ocr_enabled': ocr_enabled,
+                'ocr_languages': ocr_processor.get_available_languages() if ocr_processor else []
             }
         }
 
@@ -141,4 +151,114 @@ def download_file(filename):
         return jsonify({'error': 'File not found'}), 404
     except Exception as e:
         logger.error(f"Download error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# ==================
+# OCR Endpoints
+# ==================
+
+@main_bp.route('/extract-text', methods=['POST'])
+def extract_text():
+    """
+    Extrae texto de imagen o PDF usando OCR.
+    
+    Form Parameters:
+        - file: Archivo de imagen o PDF
+        - url: URL de imagen o PDF (alternativa a file)
+        - lang: Código de idioma (spa, eng, etc.) - opcional
+        - preprocess: true/false - aplicar preprocesamiento - opcional
+    """
+    if not ocr_enabled:
+        return jsonify({'error': 'OCR functionality is disabled'}), 503
+    
+    try:
+        # Obtener parámetros
+        lang = request.form.get('lang', os.getenv('OCR_DEFAULT_LANGUAGE', 'spa'))
+        preprocess = request.form.get('preprocess', 'true').lower() == 'true'
+        
+        upload_folder = Path(Config.UPLOAD_FOLDER)
+        source_path = None
+        
+        # Obtener archivo (subido o desde URL)
+        if 'file' in request.files and request.files['file'].filename:
+            file = request.files['file']
+            filename = secure_filename(file.filename)
+            unique_name = f"{uuid.uuid4().hex}_{filename}"
+            source_path = upload_folder / unique_name
+            file.save(source_path)
+            logger.info(f"OCR file uploaded: {unique_name}")
+        
+        elif 'url' in request.form:
+            url = request.form.get('url', '').strip()
+            if not url:
+                return jsonify({'error': 'Empty URL provided'}), 400
+            try:
+                source_path = download_file_from_url(url, upload_folder)
+                logger.info(f"OCR file downloaded from URL")
+            except ValueError as e:
+                return jsonify({'error': str(e)}), 400
+        
+        else:
+            return jsonify({'error': 'Provide either "file" or "url"'}), 400
+        
+        # Validar tamaño
+        if source_path.stat().st_size > Config.MAX_FILE_SIZE:
+            source_path.unlink()
+            logger.warning(f"OCR file too large: {source_path.stat().st_size} bytes")
+            return jsonify({'error': f'File too large. Maximum size is {Config.MAX_FILE_SIZE / (1024*1024):.0f}MB'}), 413
+        
+        # Determinar tipo de archivo
+        file_ext = source_path.suffix.lower()
+        
+        # Procesar según tipo
+        if file_ext == '.pdf':
+            max_pages = int(os.getenv('OCR_MAX_PAGES', 50))
+            result = ocr_processor.extract_text_from_pdf(
+                str(source_path),
+                lang=lang,
+                preprocess=preprocess,
+                max_pages=max_pages if max_pages > 0 else None
+            )
+        else:
+            # Asumir que es imagen
+            result = ocr_processor.extract_text_from_image(
+                str(source_path),
+                lang=lang,
+                preprocess=preprocess
+            )
+        
+        # Limpiar archivo temporal
+        if source_path.exists():
+            source_path.unlink()
+        
+        if result['success']:
+            logger.info(f"OCR extraction successful (lang: {lang}, confidence: {result.get('confidence', 0)})")
+        else:
+            logger.error(f"OCR extraction failed: {result.get('error', 'Unknown error')}")
+        
+        return jsonify(result), 200 if result['success'] else 500
+    
+    except Exception as e:
+        logger.error(f"OCR error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@main_bp.route('/ocr/languages', methods=['GET'])
+def get_ocr_languages():
+    """
+    Obtiene la lista de idiomas disponibles para OCR.
+    """
+    if not ocr_enabled:
+        return jsonify({'error': 'OCR functionality is disabled'}), 503
+    
+    try:
+        available_langs = ocr_processor.get_available_languages()
+        return jsonify({
+            'available': available_langs,
+            'supported': OCRProcessor.SUPPORTED_LANGUAGES
+        })
+    except Exception as e:
+        logger.error(f"Error getting OCR languages: {str(e)}")
         return jsonify({'error': str(e)}), 500
