@@ -2,6 +2,7 @@ FROM python:3.11-slim
 
 # Instalar dependencias del sistema para conversión de archivos
 RUN apt-get update && apt-get install -y \
+    # Conversion tools
     libreoffice \
     imagemagick \
     ffmpeg \
@@ -15,6 +16,11 @@ RUN apt-get update && apt-get install -y \
     # File type detection
     libmagic1 \
     file \
+    # Essential tools for health checks and debugging
+    curl \
+    wget \
+    netcat-openbsd \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Fix ImageMagick policy to allow PDF read/write
