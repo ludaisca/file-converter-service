@@ -4,8 +4,8 @@ services:
   file-converter:
     build: .
     container_name: file-converter-api
-    expose:
-      - "5000"
+    ports:
+      - "5000:5000"
     volumes:
       - uploads-data:/app/uploads
       - converted-data:/app/converted
