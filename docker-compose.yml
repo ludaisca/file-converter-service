@@ -4,25 +4,29 @@ services:
   file-converter:
     build: .
     container_name: file-converter-api
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     volumes:
-      - ./uploads:/app/uploads
-      - ./converted:/app/converted
-      - ./logs:/app/logs
+      - uploads-data:/app/uploads
+      - converted-data:/app/converted
+      - logs-data:/app/logs
     environment:
-      - FLASK_ENV=production
-      - MAX_FILE_SIZE=50
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-52428800}
+      - FLASK_DEBUG=${FLASK_DEBUG:-False}
+      - ENABLE_OCR=${ENABLE_OCR:-true}
+      - OCR_DEFAULT_LANGUAGE=${OCR_DEFAULT_LANGUAGE:-spa}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 10s
-    networks:
-      - converter-network
+      start_period: 40s
+    labels:
+      - "coolify.managed=true"
 
-networks:
-  converter-network:
-    driver: bridge
+volumes:
+  uploads-data:
+  converted-data:
+  logs-data:
