@@ -8,6 +8,10 @@ RUN apt-get update && apt-get install -y \
     pandoc \
     ghostscript \
     poppler-utils \
+    # OCR dependencies
+    tesseract-ocr \
+    tesseract-ocr-spa \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 # Fix ImageMagick policy to allow PDF read/write
@@ -28,7 +32,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Crear directorios para archivos
-RUN mkdir -p /app/uploads /app/converted
+RUN mkdir -p /app/uploads /app/converted /app/logs
 
 # Exponer puerto
 EXPOSE 5000
