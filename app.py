@@ -1,51 +1,64 @@
-from flask import Flask, jsonify
-from datetime import datetime
+import os
+import sys
 import threading
-from src.config import Config
-from src.logging import logger
-from src.utils import cleanup_files
-from src.routes import main_bp
+import time
+import logging
+import signal
+from pathlib import Path
+from flask import Flask
+from src.config import Config, settings
+from src.routes import register_routes
+from src.logging import setup_logging
 
-def create_app():
+def create_app(config_class=Config):
+    os.makedirs(settings.LOGS_FOLDER, exist_ok=True)
+    setup_logging()
+    logger = logging.getLogger('file_converter')
     app = Flask(__name__)
-    Config.init_app(app)
     
-    app.register_blueprint(main_bp)
+    app.config.from_object(config_class)
     
-    # Root route - API info
-    @app.route('/', methods=['GET'])
-    def root():
-        """Root endpoint - returns API information."""
-        return jsonify({
-            'success': True,
-            'service': 'file-converter-service',
-            'version': '2.0.0',
-            'status': 'operational',
-            'timestamp': datetime.utcnow().isoformat(),
-            'endpoints': {
-                'health': '/health',
-                'formats': '/formats',
-                'convert': '/convert',
-                'extract_text': '/extract-text',
-                'ocr_languages': '/ocr/languages'
-            },
-            'documentation': {
-                'github': 'https://github.com/ludaisca/file-converter-service',
-                'api_docs': '/health',
-                'issues': 'https://github.com/ludaisca/file-converter-service/issues'
-            }
-        }), 200
+    os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
+    os.makedirs(settings.CONVERTED_FOLDER, exist_ok=True)
 
+    register_routes(app)
+
+    logger.info("Application initialized successfully")
     return app
 
-if __name__ == '__main__':
+def cleanup_thread(app):
+    logger = logging.getLogger('file_converter')
+    while True:
+        try:
+            time.sleep(300)
+            now = time.time()
+            ttl = settings.MAX_UPLOAD_TIMEOUT if hasattr(settings, 'MAX_UPLOAD_TIMEOUT') else 3600
+
+            for folder in [settings.UPLOAD_FOLDER, settings.CONVERTED_FOLDER]:
+                if not folder.exists():
+                    continue
+                for item in folder.iterdir():
+                    if item.is_file():
+                        if item.stat().st_mtime < now - ttl:
+                            try:
+                                item.unlink()
+                                logger.info(f"Cleaned up old file: {item}")
+                            except Exception as e:
+                                logger.error(f"Failed to delete {item}: {e}")
+        except Exception as e:
+            logger.error(f"Error in cleanup thread: {e}")
+
+def main():
     app = create_app()
-    
-    # Start cleanup thread
-    cleanup_thread = threading.Thread(target=cleanup_files, daemon=True)
-    cleanup_thread.start()
-    
-    logger.info("Starting file-converter service...")
-    
-    # Run Flask app
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    cleaner = threading.Thread(target=cleanup_thread, args=(app,), daemon=True)
+    cleaner.start()
+    def signal_handler(sig, frame):
+        logging.getLogger('file_converter').info("Shutting down...")
+        sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+
+if __name__ == '__main__':
+    main()
