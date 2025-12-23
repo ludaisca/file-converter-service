@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  file-converter-api:
+    image: ludaisca/file-converter-service:latest
+    container_name: file-converter-api
+    restart: unless-stopped
+    
+    # CRITICAL: Coolify needs to access container on localhost
+    # Port mapping allows Coolify to forward traffic
+    ports:
+      - "5000:5000"
+    
+    # Volumes for persistence
+    volumes:
+      - uploads_data:/app/uploads
+      - converted_data:/app/converted
+      - logs_data:/app/logs
+    
+    # Environment variables for production
+    environment:
+      FLASK_ENV: production
+      FLASK_DEBUG: "False"
+      LOG_LEVEL: INFO
+      API_VERSION: "2.0.0"
+      MAX_FILE_SIZE: "52428800"      # 50MB
+      MAX_DOWNLOAD_SIZE: "104857600"  # 100MB
+      ENABLE_OCR: "true"
+      OCR_DEFAULT_LANGUAGE: "spa"
+    
+    # Health check for orchestration
+    healthcheck:
+      test: [
+        "CMD",
+        "curl",
+        "-f",
+        "http://localhost:5000/health"
+      ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=file-converter"
+    
+    # Labels for Coolify/orchestration
+    labels:
+      app: "file-converter-service"
+      version: "2.0.0"
+      environment: "production"
+
+volumes:
+  uploads_data:
+    driver: local
+  converted_data:
+    driver: local
+  logs_data:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
