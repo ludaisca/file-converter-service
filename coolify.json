@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "services": {
+    "file-converter": {
+      "image": "file-converter-service:latest",
+      "container_name": "file-converter-api",
+      "restart_policy": "unless-stopped",
+      "ports": [
+        {
+          "published": 5000,
+          "target": 5000,
+          "protocol": "tcp"
+        }
+      ],
+      "volumes": [
+        {
+          "source": "uploads-data",
+          "target": "/app/uploads",
+          "type": "volume"
+        },
+        {
+          "source": "converted-data",
+          "target": "/app/converted",
+          "type": "volume"
+        },
+        {
+          "source": "logs-data",
+          "target": "/app/logs",
+          "type": "volume"
+        }
+      ],
+      "environment": {
+        "FLASK_ENV": "production",
+        "FLASK_DEBUG": "False",
+        "MAX_FILE_SIZE": "52428800",
+        "MAX_DOWNLOAD_SIZE": "104857600",
+        "ENABLE_OCR": "true",
+        "OCR_DEFAULT_LANGUAGE": "spa",
+        "LOG_LEVEL": "INFO",
+        "API_VERSION": "2.0.0"
+      },
+      "healthcheck": {
+        "test": ["CMD", "curl", "-f", "http://localhost:5000/health"],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "start_period": 40
+      }
+    }
+  },
+  "volumes": [
+    {
+      "name": "uploads-data"
+    },
+    {
+      "name": "converted-data"
+    },
+    {
+      "name": "logs-data"
+    }
+  ],
+  "networks": {
+    "default": {
+      "driver": "bridge"
+    }
+  }
+}
