@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-spa \
     tesseract-ocr-eng \
+    # File type detection
+    libmagic1 \
+    file \
     && rm -rf /var/lib/apt/lists/*
 
 # Fix ImageMagick policy to allow PDF read/write
