@@ -198,7 +198,7 @@ class TestExtractText:
         
         assert data['success'] is False
     
-    @patch('src.config_refactored.settings')
+    @patch('src.routes.settings')
     def test_extract_text_ocr_disabled(self, mock_settings, client):
         """Probar que /extract-text falla cuando OCR está deshabilitado."""
         mock_settings.ENABLE_OCR = False
