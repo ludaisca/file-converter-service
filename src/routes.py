@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from typing import Tuple
 
-from src.config_refactored import settings
+from src.config import settings
 from src.logging import logger
 from src.exceptions import (
     FileConverterException,
@@ -26,30 +26,26 @@ from src.utils import (
     is_allowed_extension,
     get_file_extension,
     sanitize_filename,
-    get_file_size
+    get_file_size,
+    download_file_from_url,
+    gzip_response
 )
 from src.converters.factory import ConverterFactory
 from src.validators import FileValidator
 from src.ocr import OCRProcessor
-from src.utils import download_file_from_url, gzip_response
 
 main_bp = Blueprint('main', __name__)
 converter_factory = ConverterFactory()
 
-# Inicializar OCR processor
 ocr_processor = OCRProcessor(
     default_lang=settings.OCR_DEFAULT_LANGUAGE
 ) if settings.ENABLE_OCR else None
 
+def register_routes(app):
+    app.register_blueprint(main_bp)
 
 @main_bp.route('/health', methods=['GET'])
 def health_check():
-    """
-    Health check endpoint con información del sistema.
-    
-    Returns:
-        JSON con estado del servicio y métricas del sistema
-    """
     try:
         disk_usage = psutil.disk_usage('/')
         cpu_percent = psutil.cpu_percent(interval=0.1)
@@ -93,17 +89,9 @@ def health_check():
             'timestamp': datetime.utcnow().isoformat()
         }), 500
 
-
 @main_bp.route('/formats', methods=['GET'])
 def get_supported_formats():
-    """
-    Get supported conversion formats.
-    
-    Returns:
-        JSON con formatos soportados
-    """
     from src.config import Config
-    
     logger.info("Requested supported formats")
     return jsonify({
         'success': True,
@@ -111,32 +99,9 @@ def get_supported_formats():
         'timestamp': datetime.utcnow().isoformat()
     }), 200
 
-
 @main_bp.route('/convert', methods=['POST'])
 def convert_file() -> Tuple[dict, int]:
-    """
-    Convert file between formats.
-    
-    Soporta:
-    - Archivo subido directamente
-    - Descarga desde URL
-    
-    Form Parameters:
-        - file: Archivo a convertir (multipart/form-data)
-        - url: URL del archivo a descargar
-        - format: Formato destino (requerido)
-    
-    Returns:
-        JSON con información de conversión o error
-    
-    Raises:
-        UnsupportedFormatException: Formato no soportado
-        FileTooLargeException: Archivo muy grande
-        URLDownloadException: Error descargando desde URL
-        ConversionFailedException: Error en conversión
-    """
     try:
-        # Obtener y validar formato destino
         target_format = request.form.get('format', '').lower().strip()
         
         if not target_format:
@@ -154,7 +119,6 @@ def convert_file() -> Tuple[dict, int]:
         upload_folder = settings.UPLOAD_FOLDER
         source_path = None
 
-        # 1) Archivo subido
         if 'file' in request.files and request.files['file'].filename:
             file = request.files['file']
             filename = sanitize_filename(secure_filename(file.filename))
@@ -167,7 +131,6 @@ def convert_file() -> Tuple[dict, int]:
             file.save(source_path)
             logger.info(f"File uploaded: {unique_name}")
 
-        # 2) URL remota
         elif 'url' in request.form:
             url = request.form.get('url', '').strip()
             if not url:
@@ -185,7 +148,6 @@ def convert_file() -> Tuple[dict, int]:
                 details={'expected': ['file', 'url']}
             )
 
-        # Validar tamaño del archivo
         file_size = get_file_size(source_path)
         max_size_mb = settings.MAX_FILE_SIZE / (1024 * 1024)
         
@@ -193,7 +155,6 @@ def convert_file() -> Tuple[dict, int]:
             source_path.unlink()
             raise FileTooLargeException(file_size, max_size_mb)
 
-        # Convertir archivo
         original_ext = source_path.suffix.lower()
         target_ext = f".{target_format}" if not target_format.startswith('.') else target_format
         file_id = source_path.stem.split('_')[0]
@@ -218,7 +179,6 @@ def convert_file() -> Tuple[dict, int]:
                 target_format=target_ext
             )
 
-        # Limpiar archivo original
         if source_path.exists():
             source_path.unlink()
 
@@ -247,21 +207,8 @@ def convert_file() -> Tuple[dict, int]:
             'timestamp': datetime.utcnow().isoformat()
         }), 500
 
-
 @main_bp.route('/download/<filename>', methods=['GET'])
 def download_file(filename: str):
-    """
-    Download converted file.
-    
-    Args:
-        filename: Nombre del archivo a descargar
-    
-    Returns:
-        Archivo o error JSON
-    
-    Raises:
-        FileNotFoundException: Archivo no encontrado
-    """
     try:
         safe_filename = secure_filename(filename)
         file_path = settings.CONVERTED_FOLDER / safe_filename
@@ -285,42 +232,18 @@ def download_file(filename: str):
             'timestamp': datetime.utcnow().isoformat()
         }), 500
 
-
-# ==================
-# OCR Endpoints
-# ==================
-
 @main_bp.route('/extract-text', methods=['POST'])
 def extract_text():
-    """
-    Extrae texto de imagen o PDF usando OCR.
-    
-    Form Parameters:
-        - file: Archivo de imagen o PDF
-        - url: URL de imagen o PDF (alternativa a file)
-        - lang: Código de idioma (spa, eng, etc.) - opcional
-        - preprocess: true/false - aplicar preprocesamiento - opcional
-    
-    Returns:
-        JSON con texto extraído o error
-    
-    Raises:
-        OCRDisabledException: OCR deshabilitado
-        FileTooLargeException: Archivo muy grande
-        OCRProcessingException: Error en procesamiento OCR
-    """
     try:
         if not settings.ENABLE_OCR:
             raise OCRDisabledException()
         
-        # Obtener parámetros
         lang = request.form.get('lang', settings.OCR_DEFAULT_LANGUAGE)
         preprocess = request.form.get('preprocess', 'true').lower() == 'true'
         
         upload_folder = settings.UPLOAD_FOLDER
         source_path = None
         
-        # Obtener archivo (subido o desde URL)
         if 'file' in request.files and request.files['file'].filename:
             file = request.files['file']
             filename = sanitize_filename(secure_filename(file.filename))
@@ -345,7 +268,6 @@ def extract_text():
                 'Provide either "file" or "url" parameter'
             )
         
-        # Validar tamaño
         file_size = get_file_size(source_path)
         max_size_mb = settings.MAX_FILE_SIZE / (1024 * 1024)
         
@@ -353,10 +275,8 @@ def extract_text():
             source_path.unlink()
             raise FileTooLargeException(file_size, max_size_mb)
         
-        # Determinar tipo de archivo
         file_ext = source_path.suffix.lower()
         
-        # Procesar según tipo
         if file_ext == '.pdf':
             max_pages = settings.OCR_MAX_PAGES
             result = ocr_processor.extract_text_from_pdf(
@@ -366,14 +286,12 @@ def extract_text():
                 max_pages=max_pages if max_pages > 0 else None
             )
         else:
-            # Asumir que es imagen
             result = ocr_processor.extract_text_from_image(
                 str(source_path),
                 lang=lang,
                 preprocess=preprocess
             )
         
-        # Limpiar archivo temporal
         if source_path.exists():
             source_path.unlink()
         
@@ -405,18 +323,8 @@ def extract_text():
             'timestamp': datetime.utcnow().isoformat()
         }), 500
 
-
 @main_bp.route('/ocr/languages', methods=['GET'])
 def get_ocr_languages():
-    """
-    Obtiene la lista de idiomas disponibles para OCR.
-    
-    Returns:
-        JSON con idiomas disponibles
-    
-    Raises:
-        OCRDisabledException: OCR deshabilitado
-    """
     try:
         if not settings.ENABLE_OCR:
             raise OCRDisabledException()
