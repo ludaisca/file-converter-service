@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 # Fix ImageMagick policy to allow PDF read/write
 RUN if [ -f /etc/ImageMagick-6/policy.xml ]; then \
-    sed -i 's/<policy domain="coder" rights="none" pattern="PDF" \/>/<policy domain="coder" rights="read|write" pattern="PDF" \/>/g' /etc/ImageMagick-6/policy.xml; \
+    sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/g' /etc/ImageMagick-6/policy.xml; \
     fi
 
 # Configurar directorio de trabajo
