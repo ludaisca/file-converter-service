@@ -1,106 +1,87 @@
 # Changelog
 
-Todos los cambios notables en este proyecto serán documentados en este archivo.
+All notable changes to this project will be documented in this file.
 
-El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
-y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Planeado
-- Autenticación con API Keys
-- Rate limiting incorporado
-- Sistema de cola con Redis
-- Webhooks para notificaciones
-- Conversión batch de múltiples archivos
-- OCR para PDFs escaneados
-- Watermarking de imágenes
-- Compresión automática de archivos convertidos
+### Planned
+- Batch conversion support (multiple files)
+- Webhook notifications on conversion completion
+- Rate limiting per IP
+- User authentication with API keys
+- Conversion queue with Redis
 
-## [1.0.0] - 2025-12-23
+## [1.0.0] - 2024-12-23
 
-### Añadido
-- Sistema de logging estructurado con rotación automática
-- Health check endpoint con métricas del sistema (CPU, memoria, disco)
-- Compresión Gzip automática de respuestas
-- Soporte para conversión desde URL remota
-- Documentación completa de API (API.md)
-- Guía de despliegue en producción (DEPLOYMENT.md)
-- Configuración de ejemplo (.env.example)
-- Health check en Docker Compose
-- Volúmen persistente para logs
-- Sistema de limpieza automática de archivos temporales
-- Validación de tamaño de archivos configurable
-- Nombres de archivo seguros con UUID
+### Added
+- Advanced health check endpoint with system metrics (CPU, memory, disk)
+- Structured logging system with file rotation
+- Gzip compression for API responses
+- Download from URL support (remote file conversion)
+- Comprehensive validation system
+- Docker healthcheck configuration
+- Automatic cleanup thread for temporary files
+- Support for document conversion (DOCX, DOC, ODT → PDF, HTML, TXT)
+- Support for image conversion (JPG, PNG, GIF, BMP → JPG, PNG, PDF, WebP)
+- Support for video conversion (MP4, AVI, MOV, MKV → MP4, AVI, GIF)
+- Support for audio conversion (MP3, WAV, OGG, M4A, FLAC → MP3, WAV, OGG)
+- Factory pattern for converter management
+- File size validation (configurable max size)
+- Secure filename handling with UUID
+- Docker and Docker Compose support
+- Persistent volumes for uploads, conversions, and logs
 
-### Conversiones Soportadas
-- **Documentos**: DOCX, DOC, ODT, RTF → PDF, HTML, TXT
-- **Imágenes**: JPG, PNG, GIF, BMP → JPG, PNG, PDF, WebP
-- **Video**: MP4, AVI, MOV, MKV → MP4, AVI, GIF
-- **Audio**: MP3, WAV, OGG, M4A, FLAC → MP3, WAV, OGG
+### Security
+- ImageMagick policy configuration for safe PDF handling
+- File size limits to prevent DoS attacks
+- Secure filename sanitization
+- Automatic cleanup of uploaded files after conversion
 
-### Dependencias
-- Flask para API REST
-- LibreOffice para conversión de documentos
-- ImageMagick para procesamiento de imágenes
-- FFmpeg para conversión multimedia
-- Pandoc para conversiones avanzadas de documentos
-- psutil para monitoreo de sistema
+### Infrastructure
+- LibreOffice for document conversion
+- ImageMagick for image processing
+- FFmpeg for audio/video conversion
+- Pandoc for advanced document conversion
+- Ghostscript and Poppler for PDF utilities
+- Python 3.11 slim base image
+- Flask web framework
+- psutil for system monitoring
 
-### Seguridad
-- Sanitización de nombres de archivo
-- Validación de extensiones permitidas
-- Sin ejecución de código arbitrario
-- Logs sin datos sensibles
+### Documentation
+- README with installation and usage examples
+- VALIDATION checklist for deployment
+- Environment variables example (.env.example)
+- Docker Compose configuration with healthcheck
 
-## [0.3.0] - 2025-12-20
+## [0.1.0] - 2024-12-01
 
-### Añadido
-- Soporte para conversión de video a GIF
-- Mejoras en el manejo de errores
-- Tests automatizados para conversores
-
-### Corregido
-- Error al convertir archivos con nombres especiales
-- Fuga de memoria en conversiones grandes
-
-## [0.2.0] - 2025-12-15
-
-### Añadido
-- Conversión de archivos de audio
-- Endpoint `/formats` para consultar formatos soportados
-- Docker Compose para despliegue fácil
-
-### Cambiado
-- Estructura de proyecto reorganizada con patrón factory
-- Mejoras en la velocidad de conversión de imágenes
-
-## [0.1.0] - 2025-12-10
-
-### Añadido
-- Versión inicial del proyecto
-- Conversión de documentos (DOCX → PDF)
-- Conversión de imágenes (JPG, PNG)
-- API REST básica con Flask
-- Dockerfile para contenerización
-- README.md con documentación básica
+### Added
+- Initial project structure
+- Basic Flask API
+- Simple file upload and conversion
+- Dockerfile for containerization
 
 ---
 
-## Leyenda de Tipos de Cambios
+## Version History Notes
 
-- **Añadido**: Para nuevas funcionalidades
-- **Cambiado**: Para cambios en funcionalidades existentes
-- **Deprecado**: Para funcionalidades que serán eliminadas pronto
-- **Eliminado**: Para funcionalidades eliminadas
-- **Corregido**: Para corrección de bugs
-- **Seguridad**: En caso de vulnerabilidades
+### How to Release
 
----
+1. Update version in this CHANGELOG
+2. Create git tag: `git tag -a v1.0.0 -m "Release v1.0.0"`
+3. Push tag: `git push origin v1.0.0`
+4. Create GitHub release from tag
+5. Build and push Docker image with version tag
 
-## Enlaces
+### Version Numbering
 
-- [Repositorio](https://github.com/thecocoblue/file-converter-service)
-- [Issues](https://github.com/thecocoblue/file-converter-service/issues)
-- [Documentación API](./API.md)
-- [Guía de Despliegue](./DEPLOYMENT.md)
+- **MAJOR**: Breaking changes, incompatible API modifications
+- **MINOR**: New features, backwards-compatible
+- **PATCH**: Bug fixes, minor improvements
+
+[Unreleased]: https://github.com/thecocoblue/file-converter-service/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/thecocoblue/file-converter-service/releases/tag/v1.0.0
+[0.1.0]: https://github.com/thecocoblue/file-converter-service/releases/tag/v0.1.0
