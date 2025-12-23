@@ -1,85 +1,187 @@
+"""
+Funciones utilidad para el servicio de conversión.
+"""
+
 import os
-import uuid
-import requests
-import gzip
-import time
 import shutil
 from pathlib import Path
-from functools import wraps
-from werkzeug.utils import secure_filename
-from flask import request
-from .logging import logger
-from .config import Config
+from datetime import datetime, timedelta
+from typing import List
 
-def gzip_response(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        rv = f(*args, **kwargs)
-        if isinstance(rv, tuple):
-            response_data, status_code = rv[0], rv[1]
-        else:
-            response_data = rv
-            status_code = 200
+from src.config_refactored import settings
+from src.logging import logger
 
-        if request.accept_encodings.get('gzip'):
-            if isinstance(response_data, str):
-                compressed = gzip.compress(response_data.encode('utf-8'))
-                return compressed, status_code, {'Content-Encoding': 'gzip', 'Content-Type': 'application/json'}
 
-        return rv
-    return decorated_function
+def cleanup_files(days_old: int = 7) -> int:
+    """
+    Limpiar archivos temporales y convertidos anteriores a X días.
+    
+    Args:
+        days_old: Número de días para considerar como viejo
+    
+    Returns:
+        int: Número de archivos eliminados
+    """
+    
+    deleted_count = 0
+    cutoff_time = datetime.now() - timedelta(days=days_old)
+    
+    # Limpiar carpeta de uploads
+    if settings.UPLOAD_FOLDER.exists():
+        deleted_count += _cleanup_directory(
+            settings.UPLOAD_FOLDER,
+            cutoff_time
+        )
+    
+    # Limpiar carpeta de convertidos
+    if settings.CONVERTED_FOLDER.exists():
+        deleted_count += _cleanup_directory(
+            settings.CONVERTED_FOLDER,
+            cutoff_time
+        )
+    
+    # Limpiar carpeta temporal
+    if settings.TEMP_FOLDER.exists():
+        deleted_count += _cleanup_directory(
+            settings.TEMP_FOLDER,
+            cutoff_time
+        )
+    
+    logger.info(f"Cleanup completed: {deleted_count} files deleted")
+    return deleted_count
 
-def download_file_from_url(url: str, upload_folder: Path) -> Path:
-    logger.info(f"Downloading file from URL: {url}")
+
+def _cleanup_directory(directory: Path, cutoff_time: datetime) -> int:
+    """
+    Limpiar archivos de un directorio más viejos que cutoff_time.
+    
+    Args:
+        directory: Directorio a limpiar
+        cutoff_time: Tiempo de corte
+    
+    Returns:
+        int: Número de archivos eliminados
+    """
+    
+    deleted_count = 0
+    
     try:
-        response = requests.get(url, stream=True, timeout=30)
-        response.raise_for_status()
-
-        original_name = url.split('/')[-1] or 'downloaded_file'
-        name, ext = os.path.splitext(original_name)
-
-        safe_name = secure_filename(name) or 'file'
-        unique_name = f"{uuid.uuid4().hex}_{safe_name}{ext}"
-        file_path = upload_folder / unique_name
-
-        size = 0
-        with open(file_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    size += len(chunk)
-                    if size > Config.MAX_DOWNLOAD_SIZE:
-                        file_path.unlink()
-                        logger.error(f"Downloaded file exceeds maximum size")
-                        raise ValueError(f'Downloaded file exceeds maximum size of {Config.MAX_DOWNLOAD_SIZE / (1024*1024):.0f}MB')
-                    f.write(chunk)
-
-        logger.info(f"Successfully downloaded file: {unique_name} ({size} bytes)")
-        return file_path
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error downloading file from URL: {str(e)}")
-        raise ValueError(f'Error downloading file from URL: {str(e)}')
-    except Exception as e:
-        logger.error(f"Error processing downloaded file: {str(e)}")
-        raise ValueError(f'Error processing downloaded file: {str(e)}')
-
-def cleanup_files():
-    """Background task to clean up old files."""
-    logger.info("Starting cleanup thread...")
-    while True:
-        try:
-            now = time.time()
-            for folder in [Config.UPLOAD_FOLDER, Config.CONVERTED_FOLDER]:
-                if not os.path.exists(folder):
-                    continue
-                for f in os.listdir(folder):
-                    f_path = os.path.join(folder, f)
+        for file_path in directory.iterdir():
+            if file_path.is_file():
+                # Obtener tiempo de modificación
+                mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                
+                # Si es más viejo que cutoff, eliminar
+                if mtime < cutoff_time:
                     try:
-                        if os.path.isfile(f_path):
-                            if os.stat(f_path).st_mtime < now - Config.FILE_TTL:
-                                os.remove(f_path)
-                                logger.debug(f"Deleted old file: {f}")
+                        file_path.unlink()
+                        deleted_count += 1
+                        logger.debug(f"Deleted file: {file_path}")
                     except Exception as e:
-                        logger.debug(f"Error processing {f_path}: {e}")
-        except Exception as e:
-            logger.error(f"Error in cleanup loop: {e}")
-        time.sleep(Config.CLEANUP_INTERVAL)
+                        logger.warning(f"Failed to delete {file_path}: {str(e)}")
+    
+    except Exception as e:
+        logger.error(f"Error cleaning directory {directory}: {str(e)}")
+    
+    return deleted_count
+
+
+def get_file_size(file_path: Path) -> float:
+    """
+    Obtener tamaño de archivo en MB.
+    
+    Args:
+        file_path: Ruta del archivo
+    
+    Returns:
+        float: Tamaño en MB
+    """
+    if file_path.exists():
+        return file_path.stat().st_size / (1024 * 1024)
+    return 0.0
+
+
+def get_allowed_extensions() -> List[str]:
+    """
+    Obtener lista de extensiones permitidas.
+    
+    Returns:
+        List[str]: Extensiones permitidas
+    """
+    return [ext.lower() for ext in settings.ALLOWED_EXTENSIONS]
+
+
+def is_allowed_extension(filename: str) -> bool:
+    """
+    Verificar si una extensión está permitida.
+    
+    Args:
+        filename: Nombre de archivo
+    
+    Returns:
+        bool: True si está permitida
+    """
+    if '.' not in filename:
+        return False
+    
+    extension = filename.rsplit('.', 1)[1].lower()
+    return extension in get_allowed_extensions()
+
+
+def get_file_extension(filename: str) -> str:
+    """
+    Obtener extensión de archivo.
+    
+    Args:
+        filename: Nombre de archivo
+    
+    Returns:
+        str: Extensión en minúsculas
+    """
+    if '.' in filename:
+        return filename.rsplit('.', 1)[1].lower()
+    return ''
+
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitizar nombre de archivo quitando caracteres peligrosos.
+    
+    Args:
+        filename: Nombre de archivo
+    
+    Returns:
+        str: Nombre sanitizado
+    """
+    import re
+    
+    # Reemplazar caracteres peligrosos
+    filename = re.sub(r'[^\w\s.-]', '', filename)
+    # Remover más de un espacio
+    filename = re.sub(r'\s+', '_', filename)
+    # Asegurar que no empiece con punto
+    filename = filename.lstrip('.')
+    
+    return filename or 'file'
+
+
+def ensure_upload_folder_exists() -> Path:
+    """
+    Asegurar que la carpeta de uploads existe.
+    
+    Returns:
+        Path: Ruta de la carpeta
+    """
+    settings.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+    return settings.UPLOAD_FOLDER
+
+
+def ensure_converted_folder_exists() -> Path:
+    """
+    Asegurar que la carpeta de convertidos existe.
+    
+    Returns:
+        Path: Ruta de la carpeta
+    """
+    settings.CONVERTED_FOLDER.mkdir(parents=True, exist_ok=True)
+    return settings.CONVERTED_FOLDER
