@@ -1,4 +1,5 @@
-from flask import Flask
+from flask import Flask, jsonify
+from datetime import datetime
 import threading
 from src.config import Config
 from src.logging import logger
@@ -10,6 +11,30 @@ def create_app():
     Config.init_app(app)
     
     app.register_blueprint(main_bp)
+    
+    # Root route - API info
+    @app.route('/', methods=['GET'])
+    def root():
+        """Root endpoint - returns API information."""
+        return jsonify({
+            'success': True,
+            'service': 'file-converter-service',
+            'version': '2.0.0',
+            'status': 'operational',
+            'timestamp': datetime.utcnow().isoformat(),
+            'endpoints': {
+                'health': '/health',
+                'formats': '/formats',
+                'convert': '/convert',
+                'extract_text': '/extract-text',
+                'ocr_languages': '/ocr/languages'
+            },
+            'documentation': {
+                'github': 'https://github.com/ludaisca/file-converter-service',
+                'api_docs': '/health',
+                'issues': 'https://github.com/ludaisca/file-converter-service/issues'
+            }
+        }), 200
 
     return app
 
