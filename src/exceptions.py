@@ -199,3 +199,13 @@ class URLDownloadException(FileConverterException):
             status_code=400,
             details={'url': url, 'reason': reason}
         )
+
+class SecurityException(FileConverterException):
+    """Se lanza cuando el archivo no pasa validaciones de seguridad (ej. virus)."""
+    def __init__(self, message: str, details: Optional[dict] = None):
+        super().__init__(
+            message=message,
+            error_code='SECURITY_VIOLATION',
+            status_code=403,
+            details=details
+        )

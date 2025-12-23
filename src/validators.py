@@ -3,9 +3,11 @@ Validación de archivos subidos
 """
 import magic
 import os
+import clamd
 from werkzeug.utils import secure_filename
-from .config import Config
-
+from src.config import settings
+from src.exceptions import SecurityException
+from src.logging import logger
 
 class FileValidator:
     """Validador de archivos subidos"""
@@ -55,13 +57,13 @@ class FileValidator:
         
         Args:
             file: FileStorage object de Flask
-            max_size_mb: Tamaño máximo en MB (None usa Config.MAX_FILE_SIZE)
+            max_size_mb: Tamaño máximo en MB (None usa settings.MAX_FILE_SIZE)
             
         Returns:
             tuple: (is_valid, error_message, mime_type)
         """
         if max_size_mb is None:
-            max_size_mb = Config.MAX_FILE_SIZE
+            max_size_mb = settings.MAX_FILE_SIZE / (1024 * 1024)
             
         # Verificar que hay un archivo
         if not file or file.filename == '':
@@ -93,9 +95,16 @@ class FileValidator:
             if mime in category_mimes:
                 allowed = True
                 break
-                
+
+        # Allow some flexibility for binary/octet-stream if extension is whitelisted elsewhere,
+        # but for now stick to previous strict logic unless we want to break things.
+        # Actually, previous logic was strict.
         if not allowed:
-            return False, f"File type not allowed: {mime}", mime
+            # Fallback for some common types not in list (like docx sometimes showing as zip)
+            if mime in ['application/zip', 'application/x-zip-compressed'] and ext in ['.docx', '.xlsx', '.pptx', '.odt', '.ods', '.odp']:
+                 allowed = True
+            else:
+                 return False, f"File type not allowed: {mime}", mime
             
         # Verificar tamaño
         file.seek(0, os.SEEK_END)
@@ -123,3 +132,33 @@ class FileValidator:
             if mime_type in mimes:
                 return category
         return None
+
+def scan_file(file_path: str):
+    """
+    Scans a file using ClamAV.
+    Raises SecurityException if the file is infected.
+    """
+    if not settings.ENABLE_ANTIVIRUS:
+        return
+
+    try:
+        cd = clamd.ClamdNetworkSocket(settings.CLAMD_HOST, settings.CLAMD_PORT)
+        if not cd.ping():
+            logger.warning("ClamAV not reachable, skipping scan (soft fail)")
+            return
+
+        with open(file_path, 'rb') as f:
+            result = cd.instream(f)
+
+        if result and result['stream'][0] == 'FOUND':
+            virus_name = result['stream'][1]
+            logger.critical(f"Virus found in {file_path}: {virus_name}")
+            raise SecurityException(f"File infected with {virus_name}")
+
+        logger.info(f"File {file_path} is clean")
+
+    except SecurityException:
+        raise
+    except Exception as e:
+        logger.error(f"ClamAV scan error: {e}")
+        pass
