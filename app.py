@@ -6,18 +6,35 @@ import logging
 import signal
 from pathlib import Path
 from flask import Flask
+from flasgger import Swagger
+from prometheus_flask_exporter import PrometheusMetrics
+from prometheus_client import make_wsgi_app
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+
 from src.config import Config, settings
 from src.routes import register_routes
 from src.logging import setup_logging
+from src.metrics import CONVERSION_DURATION, FILES_PROCESSED, CONVERSION_ERRORS
 
 def create_app(config_class=Config):
-    os.makedirs(settings.LOGS_FOLDER, exist_ok=True)
-    setup_logging()
+    if not hasattr(create_app, 'logging_setup'):
+         os.makedirs(settings.LOGS_FOLDER, exist_ok=True)
+         setup_logging()
+         create_app.logging_setup = True
+
     logger = logging.getLogger('file_converter')
     app = Flask(__name__)
     
     app.config.from_object(config_class)
     
+    # Initialize Swagger
+    swagger = Swagger(app)
+
+    # Initialize Prometheus Metrics for Flask HTTP requests
+    if settings.ENV != 'testing':
+        metrics = PrometheusMetrics(app)
+        metrics.info('app_info', 'Application info', version=settings.API_VERSION)
+
     os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(settings.CONVERTED_FOLDER, exist_ok=True)
 

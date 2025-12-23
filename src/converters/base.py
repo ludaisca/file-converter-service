@@ -3,6 +3,7 @@ Clase base para todos los conversores
 """
 from abc import ABC, abstractmethod
 import subprocess
+import resource
 from ..config import Config
 
 
@@ -32,10 +33,23 @@ class BaseConverter(ABC):
             dict: Resultado de la conversión con 'success' y 'error' (si aplica)
         """
         pass
+
+    def _set_resource_limits(self):
+        """
+        Sets resource limits for the subprocess (CPU, Memory).
+        """
+        # Limit CPU time (soft, hard) in seconds - maybe 5 mins cpu time
+        # This is CPU time, not wall clock time.
+        resource.setrlimit(resource.RLIMIT_CPU, (300, 300))
+
+        # Limit Memory (AS - Address Space) - e.g. 2GB
+        # 2 * 1024 * 1024 * 1024 bytes
+        mem_limit = 2 * 1024 * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (mem_limit, mem_limit))
     
     def run_command(self, command: list, timeout_seconds: int = None) -> dict:
         """
-        Ejecuta un comando con timeout
+        Ejecuta un comando con timeout y límites de recursos
         
         Args:
             command: Lista con el comando y argumentos
@@ -53,7 +67,8 @@ class BaseConverter(ABC):
                 capture_output=True,
                 text=True,
                 timeout=timeout_seconds,
-                check=True
+                check=True,
+                preexec_fn=self._set_resource_limits
             )
             return {
                 'success': True,
