@@ -41,8 +41,11 @@ def create_app():
 if __name__ == '__main__':
     app = create_app()
     
+    # Start cleanup thread
     cleanup_thread = threading.Thread(target=cleanup_files, daemon=True)
     cleanup_thread.start()
     
     logger.info("Starting file-converter service...")
+    
+    # Run Flask app
     app.run(host='0.0.0.0', port=5000, debug=False)
