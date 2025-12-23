@@ -101,6 +101,7 @@ class Config:
     UPLOAD_FOLDER = settings.UPLOAD_FOLDER
     CONVERTED_FOLDER = settings.CONVERTED_FOLDER
     LOGS_FOLDER = settings.LOGS_FOLDER
+    MAX_FILE_SIZE = settings.MAX_FILE_SIZE
 
 def get_settings() -> Settings:
     return settings
