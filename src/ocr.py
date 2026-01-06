@@ -8,6 +8,9 @@ import os
 import logging
 from pdf2image import convert_from_path
 import tempfile
+import numpy as np
+from skimage.transform import rotate
+from deskew import determine_skew
 
 
 logger = logging.getLogger(__name__)
@@ -61,12 +64,26 @@ class OCRProcessor:
             # Mejorar nitidez
             image = image.filter(ImageFilter.SHARPEN)
         
-        # TODO: Implementar deskew si es necesario
-        # (requiere biblioteca adicional como deskew o scipy)
+        if deskew:
+            try:
+                # Convertir a array numpy
+                image_np = np.array(image)
+
+                # Detectar ángulo
+                angle = determine_skew(image_np)
+
+                # Corregir si el ángulo es significativo (> 0.5 grados)
+                if angle and abs(angle) > 0.5:
+                    # Rotar (resize=True para no recortar, mode='edge' para rellenar bordes)
+                    rotated = rotate(image_np, angle, resize=True, mode='edge') * 255
+                    image = Image.fromarray(rotated.astype(np.uint8))
+                    logger.debug(f"Image deskewed by {angle:.2f} degrees")
+            except Exception as e:
+                logger.warning(f"Deskew failed: {str(e)}")
         
         return image
     
-    def extract_text_from_image(self, image_path, lang=None, preprocess=True):
+    def extract_text_from_image(self, image_path, lang=None, preprocess=True, deskew=True):
         """
         Extrae texto de una imagen
         
@@ -74,6 +91,7 @@ class OCRProcessor:
             image_path: Ruta de la imagen
             lang: Código de idioma ('spa', 'eng', etc.). None usa default
             preprocess: Aplicar preprocesamiento
+            deskew: Aplicar corrección de rotación (si preprocess=True)
             
         Returns:
             dict: {
@@ -90,7 +108,7 @@ class OCRProcessor:
             
             # Preprocesar si está habilitado
             if preprocess:
-                image = self.preprocess_image(image)
+                image = self.preprocess_image(image, deskew=deskew)
             
             # Idioma a usar
             language = lang or self.default_lang
