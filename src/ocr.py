@@ -40,6 +40,68 @@ class OCRProcessor:
         """
         self.default_lang = default_lang
         
+    def _reconstruct_text_from_data(self, data):
+        """
+        Reconstruye el texto a partir de los datos de Tesseract conservando la estructura básica.
+        """
+        lines = []
+        current_line = []
+
+        last_block_num = -1
+        last_par_num = -1
+        last_line_num = -1
+
+        num_items = len(data['text'])
+        for i in range(num_items):
+            text = data['text'][i]
+            try:
+                conf = int(data['conf'][i])
+            except (ValueError, TypeError):
+                conf = -1
+
+            # Ignorar elementos estructurales o texto vacío
+            if conf == -1 or not text.strip():
+                continue
+
+            block_num = data['block_num'][i]
+            par_num = data['par_num'][i]
+            line_num = data['line_num'][i]
+
+            # Primera palabra válida
+            if last_block_num == -1:
+                last_block_num = block_num
+                last_par_num = par_num
+                last_line_num = line_num
+                current_line.append(text)
+                continue
+
+            # Detectar cambios
+            new_block = block_num != last_block_num
+            new_par = par_num != last_par_num
+            new_line = line_num != last_line_num
+
+            if new_block or new_par:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                    current_line = []
+                if lines and lines[-1] != "":
+                     lines.append("") # Doble salto para párrafo
+            elif new_line:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                    current_line = []
+
+            current_line.append(text)
+
+            last_block_num = block_num
+            last_par_num = par_num
+            last_line_num = line_num
+
+        if current_line:
+            lines.append(" ".join(current_line))
+
+        return "\n".join(lines).strip()
+
     def preprocess_image(self, image, deskew=True, enhance=True):
         """
         Preprocesa imagen para mejorar precisión de OCR
@@ -113,12 +175,12 @@ class OCRProcessor:
             # Idioma a usar
             language = lang or self.default_lang
             
-            # Extraer texto
-            text = pytesseract.image_to_string(image, lang=language)
-            
-            # Obtener datos detallados (incluye confianza)
+            # Obtener datos detallados (incluye confianza y texto)
             data = pytesseract.image_to_data(image, lang=language, output_type=pytesseract.Output.DICT)
             
+            # Reconstruir texto desde los datos
+            text = self._reconstruct_text_from_data(data)
+
             # Calcular confianza promedio
             confidences = [int(conf) for conf in data['conf'] if conf != '-1']
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0
