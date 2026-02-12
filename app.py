@@ -9,6 +9,7 @@ from flask import Flask
 from src.config import Config, settings
 from src.routes import register_routes
 from src.logging import setup_logging
+from src.rate_limiter import init_limiter
 
 def create_app(config_class=Config):
     os.makedirs(settings.LOGS_FOLDER, exist_ok=True)
@@ -18,6 +19,9 @@ def create_app(config_class=Config):
     
     app.config.from_object(config_class)
     
+    # Inicializar Rate Limiting
+    init_limiter(app)
+
     os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(settings.CONVERTED_FOLDER, exist_ok=True)
 
