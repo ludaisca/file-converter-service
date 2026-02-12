@@ -91,5 +91,5 @@ RUN echo "=== Herramientas Instaladas ===" && \
 # Exponer puerto
 EXPOSE 5000
 
-# Comando de inicio
-CMD ["python", "app.py"]
+# Comando de inicio con Gunicorn (producción)
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]
