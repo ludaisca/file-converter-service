@@ -3,7 +3,6 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 from pathlib import Path
-import psutil
 import time
 from datetime import datetime
 from typing import Tuple
@@ -96,33 +95,12 @@ def register_routes(app):
 @limiter.limit(HEALTH_LIMIT)
 def health_check():
     try:
-        disk_usage = psutil.disk_usage('/')
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        memory_info = psutil.virtual_memory()
-
         health_data = {
             'success': True,
             'status': 'healthy',
             'service': 'file-converter',
-            'timestamp': datetime.utcnow().isoformat(),
-            'uptime_seconds': time.time(),
-            'system': {
-                'cpu_usage_percent': cpu_percent,
-                'memory_usage_percent': memory_info.percent,
-                'memory_available_mb': memory_info.available / (1024 * 1024),
-                'disk_usage_percent': disk_usage.percent,
-                'disk_free_gb': disk_usage.free / (1024 ** 3)
-            },
-            'api': {
-                'version': '2.0.0',
-                'upload_folder_exists': settings.UPLOAD_FOLDER.exists(),
-                'converted_folder_exists': settings.CONVERTED_FOLDER.exists(),
-                'logs_folder_exists': settings.LOGS_FOLDER.exists()
-            },
-            'features': {
-                'ocr_enabled': settings.ENABLE_OCR,
-                'ocr_languages': ocr_processor.get_available_languages() if ocr_processor else []
-            }
+            'version': '2.0.0',
+            'timestamp': datetime.utcnow().isoformat()
         }
 
         logger.info("Health check performed successfully")
