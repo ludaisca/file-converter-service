@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 import os
 import uuid
+import shutil
 from pathlib import Path
 import time
 from datetime import datetime
@@ -34,6 +35,7 @@ from src.validators import FileValidator
 from src.ocr import OCRProcessor
 from src.rate_limiter import limiter, CONVERT_LIMIT, HEALTH_LIMIT
 from src.async_worker import async_manager, TaskStatus
+from src.cache_manager import get_cache
 
 main_bp = Blueprint('main', __name__)
 converter_factory = ConverterFactory()
@@ -42,11 +44,37 @@ ocr_processor = OCRProcessor(
     default_lang=settings.OCR_DEFAULT_LANGUAGE
 ) if settings.ENABLE_OCR else None
 
+# Get global cache instance
+cache = get_cache()
+
 def process_conversion_task(source_path_str: str, output_path_str: str, original_ext: str, target_ext: str, file_id: str):
-    """Función auxiliar ejecutada por el worker."""
+    """Función auxiliar ejecutada por el worker con soporte de caché."""
     try:
         source_path = Path(source_path_str)
         output_path = Path(output_path_str)
+
+        # Check cache first
+        cached_result = cache.get(source_path, target_ext)
+        if cached_result:
+            logger.info(f"Using cached result for {original_ext} -> {target_ext} (ID: {file_id})")
+            
+            # Copy cached file to output path
+            cached_file = Path(cached_result['output_path'])
+            if cached_file.exists():
+                shutil.copy2(cached_file, output_path)
+                
+                # Update result with new paths
+                result = cached_result.copy()
+                result['output_path'] = str(output_path)
+                result['download_url'] = f'/download/{output_path.name}'
+                result['cached'] = True
+                result['timestamp'] = datetime.utcnow().isoformat()
+                
+                # Clean up source file
+                if source_path.exists():
+                    source_path.unlink()
+                
+                return result
 
         logger.info(f"Worker starting conversion {original_ext} -> {target_ext} (ID: {file_id})")
 
@@ -64,20 +92,28 @@ def process_conversion_task(source_path_str: str, output_path_str: str, original
                 source_path.unlink()
             raise Exception(error_msg)
 
-        if source_path.exists():
-            source_path.unlink()
-
         logger.info(f"Worker conversion completed (ID: {file_id})")
 
-        return {
+        result = {
             'success': True,
             'file_id': file_id,
             'source_format': original_ext,
             'output_format': target_ext,
             'output_size_mb': get_file_size(output_path),
+            'output_path': str(output_path),
             'download_url': f'/download/{output_path.name}',
+            'cached': False,
             'timestamp': datetime.utcnow().isoformat()
         }
+        
+        # Store in cache for future use
+        cache.set(source_path, target_ext, result)
+        
+        # Clean up source file
+        if source_path.exists():
+            source_path.unlink()
+
+        return result
 
     except Exception as e:
         logger.error(f"Worker exception: {str(e)}", exc_info=True)
@@ -95,11 +131,15 @@ def register_routes(app):
 @limiter.limit(HEALTH_LIMIT)
 def health_check():
     try:
+        # Get cache health status
+        cache_health = cache.health_check()
+        
         health_data = {
             'success': True,
             'status': 'healthy',
             'service': 'file-converter',
-            'version': '2.0.0',
+            'version': '2.1.0',  # Updated version
+            'cache': cache_health,
             'timestamp': datetime.utcnow().isoformat()
         }
 
@@ -126,6 +166,48 @@ def get_supported_formats():
         'supported_formats': Config.SUPPORTED_CONVERSIONS,
         'timestamp': datetime.utcnow().isoformat()
     }), 200
+
+@main_bp.route('/cache/stats', methods=['GET'])
+@limiter.limit(HEALTH_LIMIT)
+def get_cache_stats():
+    """Get cache statistics and performance metrics."""
+    try:
+        stats = cache.get_stats()
+        return jsonify({
+            'success': True,
+            'cache': stats,
+            'timestamp': datetime.utcnow().isoformat()
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get cache statistics',
+            'error_code': 'CACHE_STATS_ERROR',
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
+
+@main_bp.route('/cache/clear', methods=['POST'])
+@limiter.limit(CONVERT_LIMIT)
+def clear_cache():
+    """Clear all cache entries (admin endpoint)."""
+    try:
+        deleted = cache.clear_all()
+        logger.info(f"Cache cleared: {deleted} entries deleted")
+        return jsonify({
+            'success': True,
+            'message': f'Cache cleared successfully',
+            'entries_deleted': deleted,
+            'timestamp': datetime.utcnow().isoformat()
+        }), 200
+    except Exception as e:
+        logger.error(f"Error clearing cache: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Failed to clear cache',
+            'error_code': 'CACHE_CLEAR_ERROR',
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
 
 @main_bp.route('/convert', methods=['POST'])
 @limiter.limit(CONVERT_LIMIT)
