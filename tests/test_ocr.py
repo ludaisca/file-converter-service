@@ -64,18 +64,11 @@ class TestOCRProcessor:
 
     @patch('src.ocr.convert_from_path')
     @patch('src.ocr.OCRProcessor.extract_text_from_image')
-    @patch('tempfile.NamedTemporaryFile')
-    @patch('os.unlink')
-    def test_extract_text_from_pdf_success(self, mock_unlink, mock_temp, mock_extract_img, mock_convert):
+    def test_extract_text_from_pdf_success(self, mock_extract_img, mock_convert):
         """Probar extracción exitosa de texto de PDF."""
         # Mock pages
         mock_page = MagicMock()
         mock_convert.return_value = [mock_page, mock_page]
-
-        # Mock temp file
-        mock_temp_obj = MagicMock()
-        mock_temp_obj.name = '/tmp/temp.png'
-        mock_temp.return_value.__enter__.return_value = mock_temp_obj
 
         # Mock image extraction
         mock_extract_img.return_value = {
@@ -90,6 +83,9 @@ class TestOCRProcessor:
         assert result['total_pages'] == 2
         assert "Page text" in result['full_text']
         assert result['avg_confidence'] == 90
+
+        # Verify extract_text_from_image was called with the image object
+        mock_extract_img.assert_any_call(mock_page, None, True)
 
     @patch('src.ocr.convert_from_path')
     def test_extract_text_from_pdf_failure(self, mock_convert):

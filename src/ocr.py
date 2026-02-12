@@ -4,10 +4,8 @@ Extrae texto de imágenes y PDFs usando Tesseract
 """
 import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
-import os
 import logging
 from pdf2image import convert_from_path
-import tempfile
 import numpy as np
 from skimage.transform import rotate
 from deskew import determine_skew
@@ -83,12 +81,12 @@ class OCRProcessor:
         
         return image
     
-    def extract_text_from_image(self, image_path, lang=None, preprocess=True, deskew=True):
+    def extract_text_from_image(self, image_input, lang=None, preprocess=True, deskew=True):
         """
         Extrae texto de una imagen
         
         Args:
-            image_path: Ruta de la imagen
+            image_input: Ruta de la imagen (str) o objeto PIL Image
             lang: Código de idioma ('spa', 'eng', etc.). None usa default
             preprocess: Aplicar preprocesamiento
             deskew: Aplicar corrección de rotación (si preprocess=True)
@@ -104,7 +102,10 @@ class OCRProcessor:
         """
         try:
             # Cargar imagen
-            image = Image.open(image_path)
+            if isinstance(image_input, str):
+                image = Image.open(image_input)
+            else:
+                image = image_input
             
             # Preprocesar si está habilitado
             if preprocess:
@@ -131,7 +132,8 @@ class OCRProcessor:
             }
             
         except Exception as e:
-            logger.error(f"OCR failed for {image_path}: {str(e)}")
+            source_info = image_input if isinstance(image_input, str) else "Image Object"
+            logger.error(f"OCR failed for {source_info}: {str(e)}")
             return {
                 'success': False,
                 'error': str(e),
@@ -173,16 +175,8 @@ class OCRProcessor:
             
             # Procesar cada página
             for i, image in enumerate(images, 1):
-                # Guardar imagen temporalmente
-                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                    tmp_path = tmp.name
-                    image.save(tmp_path, 'PNG')
-                
                 # Extraer texto
-                result = self.extract_text_from_image(tmp_path, lang, preprocess)
-                
-                # Limpiar archivo temporal
-                os.unlink(tmp_path)
+                result = self.extract_text_from_image(image, lang, preprocess)
                 
                 # Guardar resultado de la página
                 page_result = {
