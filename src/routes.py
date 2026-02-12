@@ -33,6 +33,7 @@ from src.utils import (
 from src.converters.factory import ConverterFactory
 from src.validators import FileValidator
 from src.ocr import OCRProcessor
+from src.rate_limiter import limiter, CONVERT_LIMIT, HEALTH_LIMIT
 
 main_bp = Blueprint('main', __name__)
 converter_factory = ConverterFactory()
@@ -45,6 +46,7 @@ def register_routes(app):
     app.register_blueprint(main_bp)
 
 @main_bp.route('/health', methods=['GET'])
+@limiter.limit(HEALTH_LIMIT)
 def health_check():
     try:
         disk_usage = psutil.disk_usage('/')
@@ -90,6 +92,7 @@ def health_check():
         }), 500
 
 @main_bp.route('/formats', methods=['GET'])
+@limiter.limit(HEALTH_LIMIT)
 def get_supported_formats():
     from src.config import Config
     logger.info("Requested supported formats")
@@ -100,6 +103,7 @@ def get_supported_formats():
     }), 200
 
 @main_bp.route('/convert', methods=['POST'])
+@limiter.limit(CONVERT_LIMIT)
 def convert_file() -> Tuple[dict, int]:
     try:
         target_format = request.form.get('format', '').lower().strip()
@@ -233,6 +237,7 @@ def download_file(filename: str):
         }), 500
 
 @main_bp.route('/extract-text', methods=['POST'])
+@limiter.limit(CONVERT_LIMIT)
 def extract_text():
     try:
         if not settings.ENABLE_OCR:
@@ -324,6 +329,7 @@ def extract_text():
         }), 500
 
 @main_bp.route('/ocr/languages', methods=['GET'])
+@limiter.limit(HEALTH_LIMIT)
 def get_ocr_languages():
     try:
         if not settings.ENABLE_OCR:
