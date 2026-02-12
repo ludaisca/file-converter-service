@@ -1,0 +1,96 @@
+# ============================================================================
+# Minimal Dockerfile - Documents + Images Only
+# ============================================================================
+# Ultra-light version: ~500MB (80% reduction from original)
+# Use this if you ONLY need:
+#   - Document conversions (PDF, DOCX, etc.)
+#   - Basic image conversions (JPG, PNG, etc.)
+#   - OCR functionality
+# Excludes: Audio/Video processing, advanced image formats
+# ============================================================================
+
+FROM python:3.11-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# ============================================================================
+# STAGE 1: Python dependencies
+# ============================================================================
+FROM base AS python-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ make \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# ============================================================================
+# STAGE 2: Runtime (minimal tools)
+# ============================================================================
+FROM python:3.11-slim AS runtime
+
+LABEL maintainer="Ludaisca" \
+      version="2.1.0-minimal" \
+      description="File Converter Service - Minimal Build (Documents + Images)"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/root/.local/bin:$PATH"
+
+# Install ONLY essential conversion tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Essential
+    curl \
+    ca-certificates \
+    libmagic1 \
+    file \
+    # Document conversion (minimal LibreOffice)
+    libreoffice-writer-nogui \
+    libreoffice-calc-nogui \
+    libreoffice-core \
+    pandoc \
+    poppler-utils \
+    ghostscript \
+    # Image conversion (basic)
+    imagemagick \
+    # OCR
+    tesseract-ocr \
+    tesseract-ocr-spa \
+    tesseract-ocr-eng \
+    # Archive support
+    zip \
+    unzip \
+    p7zip-full \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/* /var/cache/apt/archives/*
+
+# Fix ImageMagick policy
+RUN if [ -f /etc/ImageMagick-6/policy.xml ]; then \
+    sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/g' /etc/ImageMagick-6/policy.xml; \
+    fi
+
+# Copy Python packages
+COPY --from=python-builder /root/.local /root/.local
+
+WORKDIR /app
+
+# Create directories
+RUN mkdir -p /app/uploads /app/converted /app/logs /app/temp && \
+    chmod -R 755 /app
+
+# Copy application
+COPY --chown=root:root . .
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+EXPOSE 5000
+
+# Start Gunicorn
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]
