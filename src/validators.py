@@ -12,7 +12,7 @@ class FileValidator:
     
     # MIME types permitidos por categoría
     ALLOWED_MIMES = {
-        'documents': [
+        'documents': {
             'application/pdf',
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -20,8 +20,8 @@ class FileValidator:
             'application/rtf',
             'text/plain',
             'text/html',
-        ],
-        'images': [
+        },
+        'images': {
             'image/jpeg',
             'image/png',
             'image/gif',
@@ -29,23 +29,23 @@ class FileValidator:
             'image/tiff',
             'image/webp',
             'image/svg+xml',
-        ],
-        'audio': [
+        },
+        'audio': {
             'audio/mpeg',
             'audio/wav',
             'audio/ogg',
             'audio/mp4',
             'audio/x-m4a',
             'audio/flac',
-        ],
-        'video': [
+        },
+        'video': {
             'video/mp4',
             'video/x-msvideo',
             'video/quicktime',
             'video/x-matroska',
             'video/x-flv',
             'video/x-ms-wmv',
-        ]
+        }
     }
     
     @staticmethod
