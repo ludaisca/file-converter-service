@@ -4,6 +4,45 @@ from .ffmpeg import FFmpegConverter
 from .archive import ArchiveConverter
 
 class ConverterFactory:
+    # Archivos Comprimidos
+    ARCHIVE_INPUT = {'.zip', '.7z', '.rar', '.tar', '.gz', '.bz2', '.xz'}
+    ARCHIVE_OUTPUT = {'.zip', '.7z', '.tar', '.tar.gz', '.gz'}
+
+    # Documentos, Hojas de Cálculo, Presentaciones (LibreOffice)
+    DOC_INPUT = {
+        '.docx', '.doc', '.odt', '.rtf', '.txt', '.html', '.htm',
+        '.xlsx', '.xls', '.csv', '.ods',
+        '.pptx', '.ppt', '.odp'
+    }
+    DOC_OUTPUT = {
+        '.pdf', '.docx', '.doc', '.txt', '.html', '.odt', '.rtf',
+        '.xlsx', '.xls', '.csv', '.ods',
+        '.pptx', '.ppt', '.odp'
+    }
+
+    # Imágenes (ImageMagick)
+    IMG_INPUT = {
+        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif',
+        '.webp', '.svg', '.heic', '.avif', '.ico', '.psd', '.xcf'
+    }
+    IMG_OUTPUT = {
+        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp',
+        '.tiff', '.ico', '.pdf', '.svg'
+    }
+
+    # Audio / Video (FFmpeg)
+    AV_INPUT = {
+        '.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm',
+        '.m4v', '.3gp', '.f4v', '.m2ts', '.mts', '.ts',
+        '.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac',
+        '.opus', '.wma', '.aiff', '.ape'
+    }
+    AV_OUTPUT = {
+        '.mp4', '.avi', '.mov', '.mkv', '.webm', '.gif', '.webp', '.3gp',
+        '.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac',
+        '.opus', '.wma', '.aiff'
+    }
+
     def __init__(self):
         self.converters = {
             'libreoffice': LibreOfficeConverter(),
@@ -23,55 +62,23 @@ class ConverterFactory:
         Returns:
             Conversor apropiado o None
         """
-        # Listas de definición (Deben coincidir con los converters individuales)
 
         # Archivos Comprimidos
-        archive_input = ['.zip', '.7z', '.rar', '.tar', '.gz', '.bz2', '.xz']
-        archive_output = ['.zip', '.7z', '.tar', '.tar.gz', '.gz']
-        if from_ext in archive_input and to_ext in archive_output:
+        if from_ext in self.ARCHIVE_INPUT and to_ext in self.ARCHIVE_OUTPUT:
             return self.converters['archive']
 
         # Documentos, Hojas de Cálculo, Presentaciones (LibreOffice)
-        doc_input = [
-            '.docx', '.doc', '.odt', '.rtf', '.txt', '.html', '.htm',
-            '.xlsx', '.xls', '.csv', '.ods',
-            '.pptx', '.ppt', '.odp'
-        ]
-        doc_output = [
-            '.pdf', '.docx', '.doc', '.txt', '.html', '.odt', '.rtf',
-            '.xlsx', '.xls', '.csv', '.ods',
-            '.pptx', '.ppt', '.odp'
-        ]
-        if from_ext in doc_input and to_ext in doc_output:
+        if from_ext in self.DOC_INPUT and to_ext in self.DOC_OUTPUT:
             # Prioridad: Si es imagen -> imagen, usar ImageMagick.
             # Pero aquí son documentos.
             return self.converters['libreoffice']
 
         # Imágenes (ImageMagick)
-        img_input = [
-            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif',
-            '.webp', '.svg', '.heic', '.avif', '.ico', '.psd', '.xcf'
-        ]
-        img_output = [
-            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp',
-            '.tiff', '.ico', '.pdf', '.svg'
-        ]
-        if from_ext in img_input and to_ext in img_output:
+        if from_ext in self.IMG_INPUT and to_ext in self.IMG_OUTPUT:
             return self.converters['imagemagick']
 
         # Audio / Video (FFmpeg)
-        av_input = [
-            '.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm',
-            '.m4v', '.3gp', '.f4v', '.m2ts', '.mts', '.ts',
-            '.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac',
-            '.opus', '.wma', '.aiff', '.ape'
-        ]
-        av_output = [
-            '.mp4', '.avi', '.mov', '.mkv', '.webm', '.gif', '.webp', '.3gp',
-            '.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac',
-            '.opus', '.wma', '.aiff'
-        ]
-        if from_ext in av_input and to_ext in av_output:
+        if from_ext in self.AV_INPUT and to_ext in self.AV_OUTPUT:
             return self.converters['ffmpeg']
 
         return None
