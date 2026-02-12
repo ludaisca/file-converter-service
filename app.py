@@ -10,11 +10,16 @@ from src.config import Config, settings
 from src.routes import register_routes
 from src.logging import setup_logging
 from src.rate_limiter import init_limiter
+from src.async_worker import async_manager
 
 def create_app(config_class=Config):
     os.makedirs(settings.LOGS_FOLDER, exist_ok=True)
     setup_logging()
     logger = logging.getLogger('file_converter')
+
+    # Iniciar el worker asíncrono
+    async_manager.start()
+
     app = Flask(__name__)
     
     app.config.from_object(config_class)
@@ -58,6 +63,7 @@ def main():
     cleaner.start()
     def signal_handler(sig, frame):
         logging.getLogger('file_converter').info("Shutting down...")
+        async_manager.stop()
         sys.exit(0)
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)

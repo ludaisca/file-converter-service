@@ -34,6 +34,7 @@ from src.converters.factory import ConverterFactory
 from src.validators import FileValidator
 from src.ocr import OCRProcessor
 from src.rate_limiter import limiter, CONVERT_LIMIT, HEALTH_LIMIT
+from src.async_worker import async_manager, TaskStatus
 
 main_bp = Blueprint('main', __name__)
 converter_factory = ConverterFactory()
@@ -41,6 +42,52 @@ converter_factory = ConverterFactory()
 ocr_processor = OCRProcessor(
     default_lang=settings.OCR_DEFAULT_LANGUAGE
 ) if settings.ENABLE_OCR else None
+
+def process_conversion_task(source_path_str: str, output_path_str: str, original_ext: str, target_ext: str, file_id: str):
+    """Función auxiliar ejecutada por el worker."""
+    try:
+        source_path = Path(source_path_str)
+        output_path = Path(output_path_str)
+
+        logger.info(f"Worker starting conversion {original_ext} -> {target_ext} (ID: {file_id})")
+
+        conversion_result = converter_factory.perform_conversion(
+            str(source_path),
+            str(output_path),
+            original_ext,
+            target_ext
+        )
+
+        if not conversion_result['success']:
+            error_msg = conversion_result.get('error', 'Unknown error')
+            logger.error(f"Worker conversion failed: {error_msg}")
+            if source_path.exists():
+                source_path.unlink()
+            raise Exception(error_msg)
+
+        if source_path.exists():
+            source_path.unlink()
+
+        logger.info(f"Worker conversion completed (ID: {file_id})")
+
+        return {
+            'success': True,
+            'file_id': file_id,
+            'source_format': original_ext,
+            'output_format': target_ext,
+            'output_size_mb': get_file_size(output_path),
+            'download_url': f'/download/{output_path.name}',
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Worker exception: {str(e)}", exc_info=True)
+        if Path(source_path_str).exists():
+            Path(source_path_str).unlink()
+        raise e
+
+# Registrar handler para conversión
+async_manager.register_handler("conversion", process_conversion_task)
 
 def register_routes(app):
     app.register_blueprint(main_bp)
@@ -165,38 +212,24 @@ def convert_file() -> Tuple[dict, int]:
         output_filename = f"{file_id}{target_ext}"
         output_path = settings.CONVERTED_FOLDER / output_filename
 
-        logger.info(f"Starting conversion {original_ext} → {target_ext} (ID: {file_id})")
+        logger.info(f"Queuing conversion {original_ext} → {target_ext} (ID: {file_id})")
 
-        conversion_result = converter_factory.perform_conversion(
-            str(source_path),
-            str(output_path),
-            original_ext,
-            target_ext
+        task_id = async_manager.submit_task(
+            "conversion",
+            source_path_str=str(source_path),
+            output_path_str=str(output_path),
+            original_ext=original_ext,
+            target_ext=target_ext,
+            file_id=file_id
         )
-
-        if not conversion_result['success']:
-            if source_path.exists():
-                source_path.unlink()
-            raise ConversionFailedException(
-                conversion_result.get('error', 'Unknown error'),
-                source_format=original_ext,
-                target_format=target_ext
-            )
-
-        if source_path.exists():
-            source_path.unlink()
-
-        logger.info(f"Conversion completed successfully (ID: {file_id})")
 
         return jsonify({
             'success': True,
-            'file_id': file_id,
-            'source_format': original_ext,
-            'output_format': target_format,
-            'output_size_mb': get_file_size(output_path),
-            'download_url': f'/download/{output_filename}',
+            'message': 'Conversion started',
+            'task_id': task_id,
+            'status_url': f'/status/{task_id}',
             'timestamp': datetime.utcnow().isoformat()
-        }), 200
+        }), 202
 
     except FileConverterException as e:
         logger.warning(f"{e.error_code}: {e.message}")
@@ -210,6 +243,31 @@ def convert_file() -> Tuple[dict, int]:
             'error_code': 'CONVERSION_ERROR',
             'timestamp': datetime.utcnow().isoformat()
         }), 500
+
+@main_bp.route('/status/<task_id>', methods=['GET'])
+@limiter.limit(HEALTH_LIMIT)
+def get_task_status(task_id: str):
+    status = async_manager.get_status(task_id)
+    if not status:
+        return jsonify({
+            'success': False,
+            'error': 'Task not found',
+            'error_code': 'TASK_NOT_FOUND'
+        }), 404
+
+    response = {
+        'task_id': task_id,
+        'status': status['status'],
+        'submitted_at': status.get('created_at'),
+        'completed_at': status.get('updated_at')
+    }
+
+    if status['status'] == TaskStatus.COMPLETED:
+        response['result'] = status['result']
+    elif status['status'] == TaskStatus.FAILED:
+        response['error'] = status.get('error')
+
+    return jsonify(response), 200
 
 @main_bp.route('/download/<filename>', methods=['GET'])
 def download_file(filename: str):
