@@ -26,12 +26,20 @@ class TestOCRProcessor:
         assert self.processor.is_language_available('deu') is False
 
     @patch('src.ocr.Image.open')
-    @patch('src.ocr.pytesseract.image_to_string')
     @patch('src.ocr.pytesseract.image_to_data')
-    def test_extract_text_from_image_success(self, mock_data, mock_string, mock_open_img):
+    def test_extract_text_from_image_success(self, mock_data, mock_open_img):
         """Probar extracción exitosa de texto de imagen."""
-        mock_string.return_value = "Texto de prueba"
-        mock_data.return_value = {'conf': [90, 95, -1]} # -1 suele ser ignorado
+        mock_data.return_value = {
+            'conf': [90, 95, 95, -1],
+            'text': ['Texto', 'de', 'prueba', ''],
+            'block_num': [1, 1, 1, 1],
+            'par_num': [1, 1, 1, 1],
+            'line_num': [1, 1, 1, 2],
+            'left': [0, 0, 0, 0],
+            'top': [0, 0, 0, 0],
+            'width': [0, 0, 0, 0],
+            'height': [0, 0, 0, 0]
+        }
 
         # Crear un mock más completo que se comporte como PIL.Image
         mock_image = MagicMock()
@@ -51,6 +59,35 @@ class TestOCRProcessor:
             assert result['text'] == "Texto de prueba"
             assert result['confidence'] > 0
             assert result['language'] == 'spa'
+
+    def test_reconstruct_text_from_data(self):
+        """Probar reconstrucción de texto con estructura."""
+        data = {
+            'text': ['Párrafo', '1', '', 'Párrafo', '2', '', 'Línea', '2'],
+            'conf': ['90', '90', '-1', '90', '90', '-1', '90', '90'],
+            'block_num': [1, 1, 1, 2, 2, 2, 2, 2],
+            'par_num': [1, 1, 1, 1, 1, 1, 1, 1], # Reinicia numeración por bloque
+            'line_num': [1, 1, 2, 1, 1, 2, 2, 2]  # Reinicia numeración por párrafo
+        }
+        # Tesseract suele dar numeración secuencial global o relativa, asumimos cambio si cambia alguno.
+        # Pero mi implementación compara con el ANTERIOR.
+
+        # Caso simple:
+        # Párrafo 1 (block 1)
+        # Párrafo 2 (block 2)
+
+        data_simple = {
+            'text': ['Para1', '', 'Para2'],
+            'conf': ['90', '-1', '90'],
+            'block_num': [1, 1, 2],
+            'par_num': [1, 1, 1],
+            'line_num': [1, 2, 1]
+        }
+
+        text = self.processor._reconstruct_text_from_data(data_simple)
+        assert "Para1" in text
+        assert "Para2" in text
+        assert "\n\n" in text # Debe haber separación de párrafo/bloque
 
     @patch('src.ocr.Image.open')
     def test_extract_text_from_image_failure(self, mock_open_img):
