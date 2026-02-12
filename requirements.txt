@@ -2,6 +2,9 @@
 Flask==3.0.0
 Werkzeug==3.0.1
 
+# Production WSGI Server
+gunicorn==21.2.0
+
 # HTTP Requests
 requests==2.32.3
 
@@ -17,6 +20,9 @@ python-magic==0.4.27
 
 # Rate Limiting
 Flask-Limiter==3.5.0
+
+# Caching
+redis>=5.0.0
 
 # OCR
 pytesseract==0.3.10
@@ -41,8 +47,5 @@ mypy==1.7.1
 # Environment Variables
 python-dotenv==1.0.0
 
-# Future: Monitoring & Metrics
-# prometheus-client>=0.17.0
-
-# Future: Caching
-# redis>=5.0.0
+# Compression
+Flask-Compress==1.14

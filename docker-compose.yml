@@ -1,6 +1,33 @@
 version: '3.8'
 
 services:
+  # Redis Cache Service
+  redis:
+    image: redis:7-alpine
+    container_name: file-converter-redis
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - converter-network
+    labels:
+      - "coolify.managed=true"
+
+  # File Converter API Service
   file-converter:
     build: .
     container_name: file-converter-api
@@ -11,11 +38,39 @@ services:
       - converted-data:/app/converted
       - logs-data:/app/logs
     environment:
+      # Flask Configuration
       - FLASK_ENV=${FLASK_ENV:-production}
-      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-52428800}
       - FLASK_DEBUG=${FLASK_DEBUG:-False}
+      
+      # File Limits
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-52428800}
+      
+      # OCR Configuration
       - ENABLE_OCR=${ENABLE_OCR:-true}
       - OCR_DEFAULT_LANGUAGE=${OCR_DEFAULT_LANGUAGE:-spa}
+      - OCR_MAX_PAGES=${OCR_MAX_PAGES:-50}
+      
+      # Redis Cache Configuration
+      - REDIS_ENABLED=${REDIS_ENABLED:-true}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_SOCKET_TIMEOUT=${REDIS_SOCKET_TIMEOUT:-5}
+      - REDIS_SOCKET_CONNECT_TIMEOUT=${REDIS_SOCKET_CONNECT_TIMEOUT:-5}
+      - CACHE_TTL=${CACHE_TTL:-86400}
+      - CACHE_MAX_SIZE=${CACHE_MAX_SIZE:-104857600}
+      
+      # Gunicorn Configuration
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
+      - GUNICORN_THREADS=${GUNICORN_THREADS:-2}
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-300}
+      - GUNICORN_KEEPALIVE=${GUNICORN_KEEPALIVE:-5}
+      - GUNICORN_MAX_REQUESTS=${GUNICORN_MAX_REQUESTS:-1000}
+      - GUNICORN_MAX_REQUESTS_JITTER=${GUNICORN_MAX_REQUESTS_JITTER:-100}
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
@@ -23,10 +78,22 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - converter-network
     labels:
       - "coolify.managed=true"
 
+networks:
+  converter-network:
+    driver: bridge
+    name: file-converter-network
+
 volumes:
   uploads-data:
+    name: file-converter-uploads
   converted-data:
+    name: file-converter-converted
   logs-data:
+    name: file-converter-logs
+  redis-data:
+    name: file-converter-redis
