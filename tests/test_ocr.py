@@ -99,10 +99,14 @@ class TestOCRProcessor:
         assert result['success'] is False
         assert "File not found" in result['error']
 
+    @patch('src.ocr.pdfinfo_from_path')
     @patch('src.ocr.convert_from_path')
     @patch('src.ocr.OCRProcessor.extract_text_from_image')
-    def test_extract_text_from_pdf_success(self, mock_extract_img, mock_convert):
+    def test_extract_text_from_pdf_success(self, mock_extract_img, mock_convert, mock_pdfinfo):
         """Probar extracción exitosa de texto de PDF."""
+        # Mock pdf info
+        mock_pdfinfo.return_value = {'Pages': 2}
+
         # Mock pages
         mock_page = MagicMock()
         mock_convert.return_value = [mock_page, mock_page]
@@ -124,9 +128,13 @@ class TestOCRProcessor:
         # Verify extract_text_from_image was called with the image object
         mock_extract_img.assert_any_call(mock_page, None, True)
 
+    @patch('src.ocr.pdfinfo_from_path')
     @patch('src.ocr.convert_from_path')
-    def test_extract_text_from_pdf_failure(self, mock_convert):
+    def test_extract_text_from_pdf_failure(self, mock_convert, mock_pdfinfo):
         """Probar fallo en extracción de PDF."""
+        # Mock pdf info (success to reach convert_from_path)
+        mock_pdfinfo.return_value = {'Pages': 2}
+
         mock_convert.side_effect = Exception("PDF Error")
 
         result = self.processor.extract_text_from_pdf('doc.pdf')

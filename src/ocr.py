@@ -5,7 +5,7 @@ Extrae texto de imágenes y PDFs usando Tesseract
 import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 import logging
-from pdf2image import convert_from_path
+from pdf2image import convert_from_path, pdfinfo_from_path
 import numpy as np
 from skimage.transform import rotate
 from deskew import determine_skew
@@ -224,39 +224,55 @@ class OCRProcessor:
             }
         """
         try:
-            # Convertir PDF a imágenes
-            images = convert_from_path(pdf_path)
+            # Obtener información del PDF para procesar por lotes
+            info = pdfinfo_from_path(pdf_path)
+            total_pages_pdf = int(info["Pages"])
             
-            # Limitar páginas si se especifica
+            # Determinar el límite de páginas a procesar
+            limit = total_pages_pdf
             if max_pages:
-                images = images[:max_pages]
+                limit = min(total_pages_pdf, max_pages)
             
             pages_data = []
             full_text = []
             total_confidence = 0
             
-            # Procesar cada página
-            for i, image in enumerate(images, 1):
-                # Extraer texto
-                result = self.extract_text_from_image(image, lang, preprocess)
-                
-                # Guardar resultado de la página
-                page_result = {
-                    'page': i,
-                    'text': result['text'],
-                    'confidence': result['confidence']
-                }
-                pages_data.append(page_result)
-                full_text.append(result['text'])
-                total_confidence += result['confidence']
+            # Procesar en lotes para ahorrar memoria
+            batch_size = 10
             
-            avg_confidence = total_confidence / len(images) if images else 0
+            for start_page in range(1, limit + 1, batch_size):
+                end_page = min(start_page + batch_size - 1, limit)
+
+                # Cargar solo el lote necesario
+                chunk_images = convert_from_path(pdf_path, first_page=start_page, last_page=end_page)
+
+                for i, image in enumerate(chunk_images):
+                    global_page_num = start_page + i
+
+                    # Extraer texto
+                    result = self.extract_text_from_image(image, lang, preprocess)
+
+                    # Guardar resultado de la página
+                    page_result = {
+                        'page': global_page_num,
+                        'text': result['text'],
+                        'confidence': result['confidence']
+                    }
+                    pages_data.append(page_result)
+                    full_text.append(result['text'])
+                    total_confidence += result['confidence']
+
+                # Liberar memoria explícitamente
+                del chunk_images
+
+            processed_count = len(pages_data)
+            avg_confidence = total_confidence / processed_count if processed_count > 0 else 0
             
             return {
                 'success': True,
                 'pages': pages_data,
                 'full_text': '\n\n'.join(full_text),
-                'total_pages': len(images),
+                'total_pages': processed_count,
                 'avg_confidence': round(avg_confidence, 2),
                 'language': lang or self.default_lang
             }
