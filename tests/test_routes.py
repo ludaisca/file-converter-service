@@ -23,42 +23,24 @@ class TestHealthCheck:
         assert data['status'] == 'healthy'
         assert data['service'] == 'file-converter'
         assert 'timestamp' in data
-        assert 'system' in data
-        assert 'api' in data
-        assert 'features' in data
+        assert 'version' in data
+        assert 'system' not in data
+        assert 'api' not in data
+        assert 'features' not in data
     
-    def test_health_check_system_metrics(self, client):
-        """Probar que health check incluye métricas del sistema."""
+    def test_health_check_no_sensitive_info(self, client):
+        """Probar que health check NO incluye información sensible."""
         response = client.get('/health')
         data = response.get_json()
         
-        system = data['system']
-        assert 'cpu_usage_percent' in system
-        assert 'memory_usage_percent' in system
-        assert 'memory_available_mb' in system
-        assert 'disk_usage_percent' in system
-        assert 'disk_free_gb' in system
-    
-    def test_health_check_api_info(self, client):
-        """Probar que health check incluye información de API."""
-        response = client.get('/health')
-        data = response.get_json()
+        # Verificar que NO se expone información del sistema
+        assert 'system' not in data
         
-        api = data['api']
-        assert 'version' in api
-        assert api['version'] == '2.0.0'
-        assert 'upload_folder_exists' in api
-        assert 'converted_folder_exists' in api
-        assert 'logs_folder_exists' in api
-    
-    def test_health_check_features(self, client):
-        """Probar que health check incluye información de features."""
-        response = client.get('/health')
-        data = response.get_json()
+        # Verificar que NO se expone información detallada de la API
+        assert 'api' not in data
         
-        features = data['features']
-        assert 'ocr_enabled' in features
-        assert isinstance(features['ocr_enabled'], bool)
+        # Verificar que NO se expone configuración interna
+        assert 'features' not in data
 
 
 class TestGetSupportedFormats:
